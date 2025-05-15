@@ -121,8 +121,7 @@ public class ConfigEditorDialog extends JDialog {
         themeLabel.setForeground(fg.darker());
         themeCombo = new JComboBox<>(getAvailableThemes());
         themeCombo.setSelectedItem(properties.getProperty("THEME", "light"));
-        // Use system default look for combo box for better highlight/contrast
-        themeCombo.setUI((javax.swing.plaf.ComboBoxUI) javax.swing.UIManager.getUI(new JComboBox<>()));
+        // Removed setUI to preserve CloudyLookAndFeel
         themeCombo.setBackground(Color.WHITE);
         themeCombo.setForeground(Color.BLACK);
         themeCombo.setFocusable(false);
@@ -133,12 +132,16 @@ public class ConfigEditorDialog extends JDialog {
                 if (!selectedTheme.equals(appController.getThemeName())) {
                     properties.setProperty("THEME", selectedTheme);
                     appController.setThemeName(selectedTheme);
-                    appController.saveConfig(new File(configPath));
-                    appController.reloadConfigAndTheme(); // Ensure theme is reloaded and applied
-                    SwingUtilities.invokeLater(() -> {
-                        dispose();
-                        new ConfigEditorDialog(personGui, (JFrame) getParent(), configPath, appController).setVisible(true);
-                    });
+                    appController.loadTheme(selectedTheme);
+                    try {
+                        UIManager.setLookAndFeel(new src.app.gui.CloudyLookAndFeel(appController.getThemeProperties()));
+                        if (personGui instanceof GuiAPI guiApi) {
+                            guiApi.refreshAllUI();
+                        } else if (personGui instanceof Frame) {
+                            ((Frame) personGui).refreshAllUI();
+                        }
+                    } catch (Exception e) { e.printStackTrace(); }
+                    updateDialogTheme();
                 }
             }
         });
@@ -312,9 +315,9 @@ public class ConfigEditorDialog extends JDialog {
         cancelBtn = new JButton("Cancel");
         finishBtn = new JButton("Finish");
         finishBtn.setVisible(false);
-        // Use system default button look for better highlight/contrast
-        saveBtn.setUI((javax.swing.plaf.ButtonUI) javax.swing.UIManager.getUI(new JButton()));
-        cancelBtn.setUI((javax.swing.plaf.ButtonUI) javax.swing.UIManager.getUI(new JButton()));
+        // Removed setUI to preserve CloudyLookAndFeel
+        // saveBtn.setUI((javax.swing.plaf.ButtonUI) javax.swing.UIManager.getUI(new JButton()));
+        // cancelBtn.setUI((javax.swing.plaf.ButtonUI) javax.swing.UIManager.getUI(new JButton()));
         // Color the save button with the accent color
         Color accent = UIManager.getColor("nimbusFocus");
         if (accent == null) accent = new Color(60, 120, 220);
@@ -397,6 +400,17 @@ public class ConfigEditorDialog extends JDialog {
             appController.setThemeName(themeCombo.getSelectedItem().toString());
         }
         appController.saveConfig(new File(configPath));
+        try {
+            UIManager.setLookAndFeel(new src.app.gui.CloudyLookAndFeel(appController.getThemeProperties()));
+            for (java.awt.Window window : java.awt.Window.getWindows()) {
+                javax.swing.SwingUtilities.updateComponentTreeUI(window);
+                window.invalidate();
+                window.validate();
+                window.repaint();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         if (personGui instanceof GuiAPI guiApi) {
             guiApi.reloadConfigAndTheme();
         }

@@ -13,7 +13,6 @@ import java.io.File;
  */
 public class PersonApp {
     public static void main(String[] args) {
-        // Remove initial Metal LAF set, always use CloudyLookAndFeel
         // Check for script argument to run in batch mode
         if (args.length > 0) {
             if (args[0].equals("-script") && args.length > 1) {

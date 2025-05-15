@@ -40,4 +40,9 @@ public interface GuiAPI {
      * Hide the main application window.
      */
     void hide();
+
+    /**
+     * Recursively updates the UI of all components in the main window (for theme changes).
+     */
+    void refreshAllUI();
 }

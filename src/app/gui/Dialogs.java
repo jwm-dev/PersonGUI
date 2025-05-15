@@ -4,7 +4,6 @@ import src.app.AppController;
 import src.person.People;
 import src.person.Person;
 import javax.swing.*;
-import javax.swing.filechooser.FileFilter;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,18 +34,29 @@ public class Dialogs {
 
     public void doOpen(Runnable clearFields, Runnable clearSelection) {
         JFileChooser fileChooser = setupFileChooser(DATA_DIRECTORY, FILE_EXTENSION, false);
-        if (fileChooser.showOpenDialog(parentFrame) == JFileChooser.APPROVE_OPTION) {
-            File selectedFile = fileChooser.getSelectedFile();
-            try {
-                int count = appController.loadPeople(selectedFile);
-                if (clearFields != null) clearFields.run();
-                if (clearSelection != null) clearSelection.run();
-                appController.notifyDataChanged();
-                JOptionPane.showMessageDialog(parentFrame, count + " people loaded successfully", "Load Complete", JOptionPane.INFORMATION_MESSAGE);
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(parentFrame, "Error loading file: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-                ex.printStackTrace();
+        fileChooser.setPreferredSize(new java.awt.Dimension(700, 500));
+        LookAndFeel oldLaf = UIManager.getLookAndFeel();
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            SwingUtilities.updateComponentTreeUI(fileChooser);
+            int result = fileChooser.showOpenDialog(parentFrame);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = fileChooser.getSelectedFile();
+                try {
+                    int count = appController.loadPeople(selectedFile);
+                    if (clearFields != null) clearFields.run();
+                    if (clearSelection != null) clearSelection.run();
+                    appController.notifyDataChanged();
+                    JOptionPane.showMessageDialog(parentFrame, count + " people loaded successfully", "Load Complete", JOptionPane.INFORMATION_MESSAGE);
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(parentFrame, "Error loading file: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                    ex.printStackTrace();
+                }
             }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try { UIManager.setLookAndFeel(oldLaf); } catch (Exception ignore) {}
         }
     }
 
@@ -62,200 +72,210 @@ public class Dialogs {
 
     public void doSaveAs() {
         JFileChooser fileChooser = setupFileChooser(DATA_DIRECTORY, FILE_EXTENSION, true);
+        fileChooser.setPreferredSize(new java.awt.Dimension(700, 500));
         File currentFile = appController.getCurrentFile();
         if (currentFile != null) {
             fileChooser.setSelectedFile(currentFile);
         }
-        if (fileChooser.showSaveDialog(parentFrame) == JFileChooser.APPROVE_OPTION) {
-            File selectedFile = ensureFileExtension(fileChooser.getSelectedFile(), FILE_EXTENSION);
-            if (selectedFile.exists()) {
-                int confirm = JOptionPane.showConfirmDialog(parentFrame, "File already exists. Do you want to overwrite it?", "Confirm Overwrite", JOptionPane.YES_NO_OPTION);
-                if (confirm != JOptionPane.YES_OPTION) {
-                    return;
+        LookAndFeel oldLaf = UIManager.getLookAndFeel();
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            SwingUtilities.updateComponentTreeUI(fileChooser);
+            int result = fileChooser.showSaveDialog(parentFrame);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = ensureFileExtension(fileChooser.getSelectedFile(), FILE_EXTENSION);
+                if (selectedFile.exists()) {
+                    int confirm = JOptionPane.showConfirmDialog(parentFrame, "File already exists. Do you want to overwrite it?", "Confirm Overwrite", JOptionPane.YES_NO_OPTION);
+                    if (confirm != JOptionPane.YES_OPTION) {
+                        return;
+                    }
+                }
+                try {
+                    int count = appController.savePeopleAs(selectedFile);
+                    JOptionPane.showMessageDialog(parentFrame, count + " people saved successfully", "Save Complete", JOptionPane.INFORMATION_MESSAGE);
+                } catch (IOException ex) {
+                    JOptionPane.showMessageDialog(parentFrame, "Error saving file: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                    ex.printStackTrace();
                 }
             }
-            try {
-                int count = appController.savePeopleAs(selectedFile);
-                JOptionPane.showMessageDialog(parentFrame, count + " people saved successfully", "Save Complete", JOptionPane.INFORMATION_MESSAGE);
-            } catch (IOException ex) {
-                JOptionPane.showMessageDialog(parentFrame, "Error saving file: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-                ex.printStackTrace();
-            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try { UIManager.setLookAndFeel(oldLaf); } catch (Exception ignore) {}
         }
     }
 
     public void doImport() {
-        // Enhanced import: support .ppl, .json, and .txt
         JFileChooser fileChooser = new JFileChooser();
-        if (DATA_DIRECTORY.exists() && DATA_DIRECTORY.isDirectory()) {
-            fileChooser.setCurrentDirectory(DATA_DIRECTORY);
-        } else {
-            DATA_DIRECTORY.mkdirs();
-            fileChooser.setCurrentDirectory(DATA_DIRECTORY);
-        }
-        fileChooser.setDialogTitle("Import People File");
-        javax.swing.filechooser.FileNameExtensionFilter pplFilter = new javax.swing.filechooser.FileNameExtensionFilter("People Files (*.ppl)", "ppl");
-        javax.swing.filechooser.FileNameExtensionFilter jsonFilter = new javax.swing.filechooser.FileNameExtensionFilter("JSON Files (*.json)", "json");
-        javax.swing.filechooser.FileNameExtensionFilter txtFilter = new javax.swing.filechooser.FileNameExtensionFilter("Text Files (*.txt)", "txt");
-        fileChooser.addChoosableFileFilter(pplFilter);
-        fileChooser.addChoosableFileFilter(jsonFilter);
-        fileChooser.addChoosableFileFilter(txtFilter);
-        fileChooser.setAcceptAllFileFilterUsed(false);
-        fileChooser.setFileFilter(pplFilter);
-        if (fileChooser.showOpenDialog(parentFrame) == JFileChooser.APPROVE_OPTION) {
-            File selectedFile = fileChooser.getSelectedFile();
-            String name = selectedFile.getName().toLowerCase();
-            People importedPeople = null;
-            try {
-                if (name.endsWith(".json")) {
-                    importedPeople = importFromJson(selectedFile);
-                } else if (name.endsWith(".txt")) {
-                    importedPeople = importFromText(selectedFile);
-                } else {
-                    importedPeople = appController.importPeople(selectedFile);
-                }
-                if (importedPeople != null && !importedPeople.isEmpty()) {
-                    int importedCount = 0;
-                    List<ConflictResolution.ConflictInfo> conflicts = new ArrayList<>();
-                    List<Person> handledPersons = new ArrayList<>();
-                    // First, collect all conflicts and duplicates
-                    for (Person person : importedPeople) {
-                        if (person == null) continue;
-                        if (ConflictResolution.isExactDuplicate(person, appController.getPeople())) {
-                            handledPersons.add(person);
-                            continue;
-                        }
-                        ConflictResolution.ConflictInfo conflict = ConflictResolution.checkForConflict(person, appController.getPeople());
-                        if (conflict != null) {
-                            conflicts.add(conflict);
-                            handledPersons.add(person);
-                        }
+        fileChooser.setPreferredSize(new java.awt.Dimension(700, 500));
+        LookAndFeel oldLaf = UIManager.getLookAndFeel();
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            SwingUtilities.updateComponentTreeUI(fileChooser);
+            int result = fileChooser.showOpenDialog(parentFrame);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = fileChooser.getSelectedFile();
+                String name = selectedFile.getName().toLowerCase();
+                People importedPeople = null;
+                try {
+                    if (name.endsWith(".json")) {
+                        importedPeople = importFromJson(selectedFile);
+                    } else if (name.endsWith(".txt")) {
+                        importedPeople = importFromText(selectedFile);
+                    } else {
+                        importedPeople = appController.importPeople(selectedFile);
                     }
-                    // Resolve conflicts
-                    if (!conflicts.isEmpty()) {
-                        boolean resolveAllRemaining = false;
-                        ConflictResolution.ConflictChoice globalChoice = null;
-                        for (int i = 0; i < conflicts.size(); i++) {
-                            ConflictResolution.ConflictInfo conflict = conflicts.get(i);
-                            ConflictResolution.ConflictChoice choice;
-                            if (!resolveAllRemaining) {
-                                choice = ConflictResolution.showConflictResolutionDialogWithApplyToAll(conflict, conflicts.size() - i, parentFrame);
-                                if (choice == ConflictResolution.ConflictChoice.APPLY_TO_ALL) {
-                                    globalChoice = ConflictResolution.showGlobalResolutionDialog(parentFrame);
-                                    if (globalChoice == ConflictResolution.ConflictChoice.CANCEL) {
-                                        i--; continue;
-                                    }
-                                    resolveAllRemaining = true;
-                                    choice = globalChoice;
-                                }
-                            } else {
-                                choice = globalChoice;
-                            }
-                            if (choice == ConflictResolution.ConflictChoice.CANCEL && !resolveAllRemaining) {
+                    if (importedPeople != null && !importedPeople.isEmpty()) {
+                        int importedCount = 0;
+                        List<ConflictResolution.ConflictInfo> conflicts = new ArrayList<>();
+                        List<Person> handledPersons = new ArrayList<>();
+                        // First, collect all conflicts and duplicates
+                        for (Person person : importedPeople) {
+                            if (person == null) continue;
+                            if (ConflictResolution.isExactDuplicate(person, appController.getPeople())) {
+                                handledPersons.add(person);
                                 continue;
                             }
-                            switch (choice) {
-                                case USE_NEW:
-                                    if (appController.getPeople().update(conflict.existingIndex, conflict.newPerson)) {
-                                    }
-                                    break;
-                                case KEEP_EXISTING:
-                                    break;
-                                case SKIP:
-                                    break;
-                                default:
-                                    break;
+                            ConflictResolution.ConflictInfo conflict = ConflictResolution.checkForConflict(person, appController.getPeople());
+                            if (conflict != null) {
+                                conflicts.add(conflict);
+                                handledPersons.add(person);
                             }
                         }
-                    }
-                    // Now import only those not handled as duplicate or conflict
-                    for (Person person : importedPeople) {
-                        if (person == null) continue;
-                        if (handledPersons.contains(person)) continue;
-                        if (ConflictResolution.isExactDuplicate(person, appController.getPeople())) {
-                            continue;
+                        // Resolve conflicts
+                        if (!conflicts.isEmpty()) {
+                            boolean resolveAllRemaining = false;
+                            ConflictResolution.ConflictChoice globalChoice = null;
+                            for (int i = 0; i < conflicts.size(); i++) {
+                                ConflictResolution.ConflictInfo conflict = conflicts.get(i);
+                                ConflictResolution.ConflictChoice choice;
+                                if (!resolveAllRemaining) {
+                                    choice = ConflictResolution.showConflictResolutionDialogWithApplyToAll(conflict, conflicts.size() - i, parentFrame);
+                                    if (choice == ConflictResolution.ConflictChoice.APPLY_TO_ALL) {
+                                        globalChoice = ConflictResolution.showGlobalResolutionDialog(parentFrame);
+                                        if (globalChoice == ConflictResolution.ConflictChoice.CANCEL) {
+                                            i--; continue;
+                                        }
+                                        resolveAllRemaining = true;
+                                        choice = globalChoice;
+                                    }
+                                } else {
+                                    choice = globalChoice;
+                                }
+                                if (choice == ConflictResolution.ConflictChoice.CANCEL && !resolveAllRemaining) {
+                                    continue;
+                                }
+                                switch (choice) {
+                                    case USE_NEW:
+                                        if (appController.getPeople().update(conflict.existingIndex, conflict.newPerson)) {
+                                        }
+                                        break;
+                                    case KEEP_EXISTING:
+                                        break;
+                                    case SKIP:
+                                        break;
+                                    default:
+                                        break;
+                                }
+                            }
                         }
-                        ConflictResolution.ConflictInfo conflict = ConflictResolution.checkForConflict(person, appController.getPeople());
-                        if (conflict != null) {
-                            continue;
+                        // Now import only those not handled as duplicate or conflict
+                        for (Person person : importedPeople) {
+                            if (person == null) continue;
+                            if (handledPersons.contains(person)) continue;
+                            if (ConflictResolution.isExactDuplicate(person, appController.getPeople())) {
+                                continue;
+                            }
+                            ConflictResolution.ConflictInfo conflict = ConflictResolution.checkForConflict(person, appController.getPeople());
+                            if (conflict != null) {
+                                continue;
+                            }
+                            if (appController.getPeople().add(person)) {
+                                importedCount++;
+                            }
                         }
-                        if (appController.getPeople().add(person)) {
-                            importedCount++;
+                        appController.notifyDataChanged();
+                        if (importedCount == 0) {
+                            JOptionPane.showMessageDialog(parentFrame,
+                                "No changes were made during import. All entries already exist in the system.",
+                                "Import Complete", JOptionPane.INFORMATION_MESSAGE);
+                        } else {
+                            StringBuilder message = new StringBuilder();
+                            if (importedCount > 0) {
+                                message.append(String.format("%d %s imported successfully", 
+                                    importedCount, 
+                                    importedCount == 1 ? "person was" : "people were"));
+                            }
+                            JOptionPane.showMessageDialog(parentFrame, message.toString(),
+                                "Import Complete", JOptionPane.INFORMATION_MESSAGE);
                         }
-                    }
-                    appController.notifyDataChanged();
-                    if (importedCount == 0) {
-                        JOptionPane.showMessageDialog(parentFrame,
-                            "No changes were made during import. All entries already exist in the system.",
-                            "Import Complete", JOptionPane.INFORMATION_MESSAGE);
                     } else {
-                        StringBuilder message = new StringBuilder();
-                        if (importedCount > 0) {
-                            message.append(String.format("%d %s imported successfully", 
-                                importedCount, 
-                                importedCount == 1 ? "person was" : "people were"));
-                        }
-                        JOptionPane.showMessageDialog(parentFrame, message.toString(),
-                            "Import Complete", JOptionPane.INFORMATION_MESSAGE);
+                        JOptionPane.showMessageDialog(parentFrame, 
+                            "No people to import in the selected file.",
+                            "Import Result", JOptionPane.INFORMATION_MESSAGE);
                     }
-                } else {
+                } catch (Exception ex) {
                     JOptionPane.showMessageDialog(parentFrame, 
-                        "No people to import in the selected file.",
-                        "Import Result", JOptionPane.INFORMATION_MESSAGE);
+                        "Error importing file: " + ex.getMessage(),
+                        "Import Error", JOptionPane.ERROR_MESSAGE);
+                    ex.printStackTrace();
                 }
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(parentFrame, 
-                    "Error importing file: " + ex.getMessage(),
-                    "Import Error", JOptionPane.ERROR_MESSAGE);
-                ex.printStackTrace();
             }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try { UIManager.setLookAndFeel(oldLaf); } catch (Exception ignore) {}
         }
     }
 
     public void doExportAs() {
         JFileChooser fileChooser = new JFileChooser();
-        if (DATA_DIRECTORY.exists() && DATA_DIRECTORY.isDirectory()) {
-            fileChooser.setCurrentDirectory(DATA_DIRECTORY);
-        } else {
-            DATA_DIRECTORY.mkdirs();
-            fileChooser.setCurrentDirectory(DATA_DIRECTORY);
-        }
-        fileChooser.setDialogTitle("Export As");
-        FileFilter txtFilter = new javax.swing.filechooser.FileNameExtensionFilter("Text Files (*.txt)", "txt");
-        FileFilter jsonFilter = new javax.swing.filechooser.FileNameExtensionFilter("JSON Files (*.json)", "json");
-        fileChooser.addChoosableFileFilter(txtFilter);
+        fileChooser.setPreferredSize(new java.awt.Dimension(700, 500));
+        // Add file filters for export
+        javax.swing.filechooser.FileFilter jsonFilter = new javax.swing.filechooser.FileNameExtensionFilter("JSON Files (*.json)", "json");
+        javax.swing.filechooser.FileFilter txtFilter = new javax.swing.filechooser.FileNameExtensionFilter("Text Files (*.txt)", "txt");
         fileChooser.addChoosableFileFilter(jsonFilter);
-        fileChooser.setAcceptAllFileFilterUsed(false);
-        fileChooser.setFileFilter(txtFilter);
-        if (fileChooser.showSaveDialog(parentFrame) == JFileChooser.APPROVE_OPTION) {
-            File selectedFile = fileChooser.getSelectedFile();
-            FileFilter selectedFilter = fileChooser.getFileFilter();
-            String exportFormat = selectedFilter.equals(jsonFilter) ? "json" : "txt";
-            String filePath = selectedFile.getName();
-            File exportDir;
-            if (exportFormat.equals("json")) {
-                exportDir = new File(DATA_DIRECTORY, "json");
-            } else {
-                exportDir = new File(DATA_DIRECTORY, "txt");
-            }
-            if (!exportDir.exists()) {
-                exportDir.mkdirs();
-            }
-            File exportFile = new File(exportDir, filePath.endsWith("." + exportFormat) ? filePath : filePath + "." + exportFormat);
-            if (exportFile.exists()) {
-                int confirm = JOptionPane.showConfirmDialog(parentFrame, "File already exists. Do you want to overwrite it?", "Confirm Overwrite", JOptionPane.YES_NO_OPTION);
-                if (confirm != JOptionPane.YES_OPTION) {
-                    return;
+        fileChooser.addChoosableFileFilter(txtFilter);
+        fileChooser.setFileFilter(jsonFilter);
+        LookAndFeel oldLaf = UIManager.getLookAndFeel();
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            SwingUtilities.updateComponentTreeUI(fileChooser);
+            int result = fileChooser.showSaveDialog(parentFrame);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = fileChooser.getSelectedFile();
+                javax.swing.filechooser.FileFilter selectedFilter = fileChooser.getFileFilter();
+                String exportFormat = selectedFilter.equals(jsonFilter) ? "json" : "txt";
+                String filePath = selectedFile.getName();
+                File exportDir;
+                if (exportFormat.equals("json")) {
+                    exportDir = new File(DATA_DIRECTORY, "json");
+                } else {
+                    exportDir = new File(DATA_DIRECTORY, "txt");
+                }
+                if (!exportDir.exists()) {
+                    exportDir.mkdirs();
+                }
+                File exportFile = new File(exportDir, filePath.endsWith("." + exportFormat) ? filePath : filePath + "." + exportFormat);
+                if (exportFile.exists()) {
+                    int confirm = JOptionPane.showConfirmDialog(parentFrame, "File already exists. Do you want to overwrite it?", "Confirm Overwrite", JOptionPane.YES_NO_OPTION);
+                    if (confirm != JOptionPane.YES_OPTION) {
+                        return;
+                    }
+                }
+                try {
+                    People people = appController.getPeople();
+                    int count = appController.exportPeople(people, exportFile, exportFormat, dateFormatter);
+                    JOptionPane.showMessageDialog(parentFrame, count + " people exported successfully to " + exportFormat.toUpperCase() + " format.", "Export Complete", JOptionPane.INFORMATION_MESSAGE);
+                } catch (IOException ex) {
+                    JOptionPane.showMessageDialog(parentFrame, "Error exporting file: " + ex.getMessage(), "Export Error", JOptionPane.ERROR_MESSAGE);
+                    ex.printStackTrace();
                 }
             }
-            try {
-                People people = appController.getPeople();
-                int count = appController.exportPeople(people, exportFile, exportFormat, dateFormatter);
-                JOptionPane.showMessageDialog(parentFrame, count + " people exported successfully to " + exportFormat.toUpperCase() + " format.", "Export Complete", JOptionPane.INFORMATION_MESSAGE);
-            } catch (IOException ex) {
-                JOptionPane.showMessageDialog(parentFrame, "Error exporting file: " + ex.getMessage(), "Export Error", JOptionPane.ERROR_MESSAGE);
-                ex.printStackTrace();
-            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try { UIManager.setLookAndFeel(oldLaf); } catch (Exception ignore) {}
         }
     }
 
@@ -693,7 +713,6 @@ public class Dialogs {
                         } else {
                             currentPerson = new src.person.Person(firstName, lastName, occcDate);
                         }
-                        
                         if (currentPerson != null) {
                             people.add(currentPerson);
                         }

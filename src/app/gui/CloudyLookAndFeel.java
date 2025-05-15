@@ -57,33 +57,33 @@ public class CloudyLookAndFeel extends BasicLookAndFeel {
     public UIDefaults getDefaults() {
         UIDefaults defaults = super.getDefaults();
         // --- Cloudy theme palette from config ---
-        Color primary = Themes.getColor(theme, "PRIMARY", new Color(0x388bfd));
-        Color secondary = Themes.getColor(theme, "SECONDARY", new Color(0x21252b));
-        Color surface = Themes.getColor(theme, "SURFACE", new Color(0x1e1e1e));
-        Color background = Themes.getColor(theme, "BG", new Color(0x1e1e1e));
-        Color foreground = Themes.getColor(theme, "FG", new Color(0xd4d4d4));
-        Color error = Themes.getColor(theme, "ERROR", new Color(0xf14c4c));
-        Color border = Themes.getColor(theme, "BORDER", new Color(0x333333));
-        Color buttonBg = Themes.getColor(theme, "BUTTON_BG", secondary);
-        Color buttonFg = Themes.getColor(theme, "BUTTON_FG", foreground);
-        Color selectionBg = Themes.getColor(theme, "SELECTION_BG", new Color(0x264f78));
-        Color selectionFg = Themes.getColor(theme, "SELECTION_FG", Color.WHITE);
-        Color mainbarBg = Themes.getColor(theme, "MAINBAR_BG", new Color(0x2c313a));
-        Color mainbarFg = Themes.getColor(theme, "MAINBAR_FG", foreground);
-        Color menuSelBg = Themes.getColor(theme, "MENU_SEL_BG", new Color(0x094771));
-        Color menuSelFg = Themes.getColor(theme, "MENU_SEL_FG", Color.WHITE);
+        Color primary = Themes.getColor(theme, "PRIMARY", new Color(0x4f8cff));
+        Color secondary = Themes.getColor(theme, "SECONDARY", new Color(0xe0e7ef));
+        Color surface = Themes.getColor(theme, "SURFACE", new Color(0xffffff));
+        Color background = Themes.getColor(theme, "BG", new Color(0xffffff));
+        Color foreground = Themes.getColor(theme, "FG", new Color(0x23272e));
+        Color error = Themes.getColor(theme, "ERROR", new Color(0xe11d48));
+        Color border = Themes.getColor(theme, "BORDER", new Color(0xd1d5db));
+        Color buttonBg = Themes.getColor(theme, "BUTTON_BG", new Color(0xe0e7ef));
+        Color buttonFg = Themes.getColor(theme, "BUTTON_FG", new Color(0x23272e));
+        Color selectionBg = Themes.getColor(theme, "SELECTION_BG", new Color(0xdbeafe));
+        Color selectionFg = Themes.getColor(theme, "SELECTION_FG", new Color(0x23272e));
+        Color mainbarBg = Themes.getColor(theme, "MAINBAR_BG", new Color(0xf8fafc));
+        Color mainbarFg = Themes.getColor(theme, "MAINBAR_FG", new Color(0x23272e));
+        Color menuSelBg = Themes.getColor(theme, "MENU_SEL_BG", new Color(0xdbeafe));
+        Color menuSelFg = Themes.getColor(theme, "MENU_SEL_FG", new Color(0x23272e));
         // --- Module-specific colors ---
         Color listBg = Themes.getColor(theme, "LIST_BG", surface);
         Color listFg = Themes.getColor(theme, "LIST_FG", foreground);
         Color listSelBg = Themes.getColor(theme, "LIST_SELECTION_BG", selectionBg);
         Color listSelFg = Themes.getColor(theme, "LIST_SELECTION_FG", selectionFg);
-        Color filterBg = Themes.getColor(theme, "FILTER_BG", surface);
+        Color filterBg = Themes.getColor(theme, "FILTER_BG", mainbarBg);
         Color filterFg = Themes.getColor(theme, "FILTER_FG", foreground);
-        Color terminalBg = Themes.getColor(theme, "TERMINAL_BG", surface);
+        Color terminalBg = Themes.getColor(theme, "TERMINAL_BG", new Color(0xe5e7eb));
         Color terminalFg = Themes.getColor(theme, "TERMINAL_FG", foreground);
         Color viewerBg = Themes.getColor(theme, "VIEWER_BG", surface);
         Color viewerFg = Themes.getColor(theme, "VIEWER_FG", foreground);
-        Color viewerFieldBg = Themes.getColor(theme, "VIEWER_FIELD_BG", background);
+        Color viewerFieldBg = Themes.getColor(theme, "VIEWER_FIELD_BG", mainbarBg);
         Color viewerFieldFg = Themes.getColor(theme, "VIEWER_FIELD_FG", foreground);
         // --- Register all module color keys ---
         defaults.put("list.background", listBg);

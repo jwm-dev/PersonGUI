@@ -101,6 +101,14 @@ public class Frame extends JFrame {
         }
     }
 
+    // Recursively update UI for all children (public for theme refresh)
+    public void refreshAllUI() {
+        recursivelyUpdateComponentTreeUI(this);
+        if (getJMenuBar() != null) SwingUtilities.updateComponentTreeUI(getJMenuBar());
+        this.revalidate();
+        this.repaint();
+    }
+
     public void reloadConfigAndTheme() {
         // Always reload config and theme from AppController, then re-apply UI
         appController.reloadConfigAndTheme();

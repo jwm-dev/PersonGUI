@@ -37,13 +37,8 @@ public class GUI implements GuiAPI {
      */
     private void applyThemeEverywhere() {
         try {
-            // Always set Nimbus LookAndFeel for best theme compatibility
-            for (UIManager.LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
-                if ("Nimbus".equals(info.getName())) {
-                    UIManager.setLookAndFeel(info.getClassName());
-                    break;
-                }
-            }
+            // Only use CloudyLookAndFeel
+            UIManager.setLookAndFeel(new src.app.gui.CloudyLookAndFeel(appController.getThemeProperties()));
         } catch (Exception ignored) {}
         for (java.awt.Window window : java.awt.Window.getWindows()) {
             javax.swing.SwingUtilities.updateComponentTreeUI(window);
@@ -93,4 +88,6 @@ public class GUI implements GuiAPI {
     public void show() { frame.setVisible(true); }
     @Override
     public void hide() { frame.setVisible(false); }
+    @Override
+    public void refreshAllUI() { frame.refreshAllUI(); }
 }
