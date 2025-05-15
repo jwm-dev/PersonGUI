@@ -186,6 +186,9 @@ public class CloudyLookAndFeel extends BasicLookAndFeel {
         defaults.put("Terminal.font", monoFont);
         defaults.put("Viewer.font", uiFont);
         defaults.put("Viewer.boldFont", boldFont);
+        // Ensure all standard UI delegates are present (fixes key bindings for text components)
+        javax.swing.plaf.metal.MetalLookAndFeel metalLaf = new javax.swing.plaf.metal.MetalLookAndFeel();
+        defaults.putAll(metalLaf.getDefaults());
         return defaults;
     }
 }
