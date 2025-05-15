@@ -1,4 +1,4 @@
-package src.app.gui;
+package src.app.dialogs;
 
 import src.person.Person;
 import src.person.People;

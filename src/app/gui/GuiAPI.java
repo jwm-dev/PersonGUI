@@ -1,5 +1,6 @@
 package src.app.gui;
 
+import src.app.dialogs.Dialogs;
 import src.app.modules.filter.PFilter;
 import src.app.modules.list.PList;
 import src.app.modules.terminal.PTerminal;
@@ -14,7 +15,6 @@ import java.util.Properties;
  */
 public interface GuiAPI {
     JFrame getMainFrame();
-    MainBar getMainBar();
     PList getListModule();
     PFilter getFilterModule();
     PTerminal getTerminalModule();
@@ -40,9 +40,4 @@ public interface GuiAPI {
      * Hide the main application window.
      */
     void hide();
-
-    /**
-     * Recursively updates the UI of all components in the main window (for theme changes).
-     */
-    void refreshAllUI();
 }

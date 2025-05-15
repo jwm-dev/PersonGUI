@@ -1,13 +1,13 @@
-package src.app.gui;
+package src.app.dialogs;
 
 import javax.swing.*;
 import java.awt.*;
 import java.io.*;
 import java.util.*;
 import java.util.List;
-import java.util.ArrayList;
-import java.util.Comparator;
+
 import src.app.AppController;
+import src.app.gui.GuiAPI;
 
 public class ConfigEditorDialog extends JDialog {
     private final String configPath;
@@ -19,8 +19,6 @@ public class ConfigEditorDialog extends JDialog {
     private String originalTheme;
     private final AppController appController;
     private boolean configSaved = false;
-    private JButton cancelBtn;
-    private JButton finishBtn;
 
     private static final Map<String, String> FRIENDLY_LABELS = new LinkedHashMap<>();
     private static final String[] THEME_LABELS = {"light", "dark", "developer"};
@@ -121,7 +119,7 @@ public class ConfigEditorDialog extends JDialog {
         themeLabel.setForeground(fg.darker());
         themeCombo = new JComboBox<>(getAvailableThemes());
         themeCombo.setSelectedItem(properties.getProperty("THEME", "light"));
-        // Removed setUI to preserve CloudyLookAndFeel
+        // Removed call to undefined applyModernNimbusLookAndFeel(). Theming is now handled in GUI.applyThemeFromConfig()
         themeCombo.setBackground(Color.WHITE);
         themeCombo.setForeground(Color.BLACK);
         themeCombo.setFocusable(false);
@@ -131,48 +129,18 @@ public class ConfigEditorDialog extends JDialog {
                 String selectedTheme = themeCombo.getSelectedItem().toString();
                 if (!selectedTheme.equals(appController.getThemeName())) {
                     properties.setProperty("THEME", selectedTheme);
-                    appController.setThemeName(selectedTheme);
-                    appController.loadTheme(selectedTheme);
-                    try {
-                        UIManager.setLookAndFeel(new src.app.gui.CloudyLookAndFeel(appController.getThemeProperties()));
-                        if (personGui instanceof GuiAPI guiApi) {
-                            guiApi.refreshAllUI();
-                        } else if (personGui instanceof Frame) {
-                            ((Frame) personGui).refreshAllUI();
-                        }
-                    } catch (Exception e) { e.printStackTrace(); }
-                    updateDialogTheme();
+                    appController.setThemeName(selectedTheme); // This loads the new theme
+                    appController.saveConfig(new File(configPath));
+                    if (personGui instanceof GuiAPI guiApi) {
+                        guiApi.reloadConfigAndTheme();
+                    }
+                    src.app.gui.Themes.applyThemeAndRefreshAllWindows(appController.getThemeProperties());
+                    updateDialogTheme(); // <-- update dialog theme live
                 }
             }
-        });
-        JButton resetThemeBtn = new JButton("Reset Theme");
-        resetThemeBtn.addActionListener(_ -> {
-            // Load default config from .config/default
-            Properties defaultProps = new Properties();
-            try (FileInputStream fis = new FileInputStream("data/.config/default")) {
-                defaultProps.load(fis);
-            } catch (Exception e) {
-                // fallback: just set theme to light
-                defaultProps.setProperty("THEME", "light");
-            }
-            // Overwrite all properties with defaults
-            properties.clear();
-            properties.putAll(defaultProps);
-            // Always set theme to light if not present
-            if (!properties.containsKey("THEME")) {
-                properties.setProperty("THEME", "light");
-            }
-            themeCombo.setSelectedItem(properties.getProperty("THEME", "light"));
-            appController.applyConfigAndTheme(properties, () -> {
-                if (personGui instanceof GuiAPI guiApi) {
-                    guiApi.reloadConfigAndTheme();
-                }
-            });
-            updateDialogTheme();
         });
         themeRow.add(themeLabel, BorderLayout.WEST);
         themeRow.add(themeCombo, BorderLayout.CENTER);
-        themeRow.add(resetThemeBtn, BorderLayout.EAST);
         formPanel.add(themeRow);
         formPanel.add(Box.createVerticalStrut(8));
         // ...existing code for settings fields...
@@ -284,8 +252,6 @@ public class ConfigEditorDialog extends JDialog {
                         valueField.setText(String.valueOf(v));
                         properties.setProperty(key, String.valueOf(v));
                     }
-                    // Live preview for dimension settings
-                    applyLiveConfigPreview();
                 });
                 row.add(label, BorderLayout.WEST);
                 row.add(slider, BorderLayout.CENTER);
@@ -311,149 +277,130 @@ public class ConfigEditorDialog extends JDialog {
         add(scroll, BorderLayout.CENTER);
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         buttonPanel.setBackground(bg);
-        JButton saveBtn = new JButton("Save");
-        cancelBtn = new JButton("Cancel");
-        finishBtn = new JButton("Finish");
-        finishBtn.setVisible(false);
-        // Removed setUI to preserve CloudyLookAndFeel
-        // saveBtn.setUI((javax.swing.plaf.ButtonUI) javax.swing.UIManager.getUI(new JButton()));
-        // cancelBtn.setUI((javax.swing.plaf.ButtonUI) javax.swing.UIManager.getUI(new JButton()));
+        JButton doneBtn = new JButton("Done");
+        JButton exitBtn = new JButton("Exit");
+        // Remove old saveBtn, cancelBtn, finishBtn
         // Color the save button with the accent color
         Color accent = UIManager.getColor("nimbusFocus");
         if (accent == null) accent = new Color(60, 120, 220);
-        saveBtn.setBackground(accent);
-        saveBtn.setForeground(Color.WHITE);
-        saveBtn.setFont(saveBtn.getFont().deriveFont(Font.BOLD, 13f));
-        saveBtn.setFocusPainted(false);
-        saveBtn.setBorder(BorderFactory.createEmptyBorder(8, 18, 8, 18));
-        cancelBtn.setBackground(null);
-        cancelBtn.setForeground(null);
-        cancelBtn.setFont(cancelBtn.getFont().deriveFont(Font.BOLD, 13f));
-        cancelBtn.setFocusPainted(false);
-        cancelBtn.setBorder(BorderFactory.createEmptyBorder(8, 18, 8, 18));
-        saveBtn.addActionListener(_ -> {
-            String oldTheme = appController.getThemeName();
-            saveConfig();
-            String newTheme = appController.getThemeName();
-            configSaved = true;
-            cancelBtn.setVisible(false);
-            finishBtn.setVisible(true);
-            // If the theme changed, recreate the dialog to apply the new theme
-            if (!oldTheme.equals(newTheme)) {
-                SwingUtilities.invokeLater(() -> {
-                    dispose();
-                    new ConfigEditorDialog(personGui, (JFrame) getParent(), configPath, appController).setVisible(true);
-                });
+        doneBtn.setBackground(accent);
+        doneBtn.setForeground(Color.WHITE);
+        doneBtn.setFont(doneBtn.getFont().deriveFont(Font.BOLD, 13f));
+        doneBtn.setFocusPainted(false);
+        doneBtn.setBorder(BorderFactory.createEmptyBorder(8, 18, 8, 18));
+        exitBtn.setBackground(null);
+        exitBtn.setForeground(null);
+        exitBtn.setFont(exitBtn.getFont().deriveFont(Font.BOLD, 13f));
+        exitBtn.setFocusPainted(false);
+        exitBtn.setBorder(BorderFactory.createEmptyBorder(8, 18, 8, 18));
+        // Done button acts as Save
+        doneBtn.addActionListener(_ -> {
+            for (Map.Entry<String, JTextField> entry : fields.entrySet()) {
+                String key = entry.getKey();
+                JTextField field = entry.getValue();
+                Object sliderObj = field.getClientProperty("slider");
+                if (sliderObj instanceof JSlider) {
+                    int v = ((JSlider) sliderObj).getValue();
+                    if (key.equals("LIST_TERMINAL_DIVIDER")) {
+                        appController.setListTerminalDivider(v / 100.0);
+                    } else if (key.equals("SIDEBAR_WIDTH")) {
+                        appController.setSidebarWidth(v);
+                    } else if (key.equals("FILTER_WIDTH")) {
+                        appController.setFilterWidth(v);
+                    } else if (key.equals("WINDOW_WIDTH")) {
+                        appController.setWindowWidth(v);
+                    } else if (key.equals("WINDOW_HEIGHT")) {
+                        appController.setWindowHeight(v);
+                    }
+                } else {
+                    if (key.equals("THEME")) {
+                        appController.setThemeName(field.getText().trim());
+                        appController.loadTheme(field.getText().trim());
+                    }
+                }
             }
+            if (themeCombo != null && themeCombo.getSelectedItem() != null) {
+                appController.setThemeName(themeCombo.getSelectedItem().toString());
+                appController.loadTheme(themeCombo.getSelectedItem().toString());
+            }
+            appController.saveConfig(new File(configPath));
+            if (personGui instanceof GuiAPI guiApi) {
+                guiApi.reloadConfigAndTheme();
+            }
+            src.app.gui.Themes.applyThemeAndRefreshAllWindows(appController.getThemeProperties());
+            configSaved = true;
+            // Close dialog after saving
+            dispose();
         });
-        cancelBtn.addActionListener(_ -> {
+        // Exit button acts as Cancel/Finish
+        exitBtn.addActionListener(_ -> {
             if (configSaved) {
                 dispose();
                 return;
             }
             // Revert to original config state from AppController
             reloadConfigState();
+            // Restore the original theme for the whole app
             appController.setThemeName(originalTheme);
-            appController.reloadConfigAndTheme();
+            appController.loadTheme(originalTheme);
+            src.app.gui.Themes.applyThemeAndRefreshAllWindows(appController.getThemeProperties());
             javax.swing.SwingUtilities.updateComponentTreeUI(this);
             repaint();
             dispose();
         });
-        finishBtn.addActionListener(_ -> dispose());
-        buttonPanel.add(saveBtn);
-        buttonPanel.add(cancelBtn);
-        buttonPanel.add(finishBtn);
+        buttonPanel.add(doneBtn);
+        buttonPanel.add(exitBtn);
         add(buttonPanel, BorderLayout.SOUTH);
+
+        updateDialogTheme();
+    }
+
+    private void applyThemeRecursively(Component comp) {
+        if (comp instanceof JPanel) {
+            comp.setBackground(UIManager.getColor("Panel.background"));
+            comp.setForeground(UIManager.getColor("Label.foreground"));
+        } else if (comp instanceof JLabel) {
+            comp.setForeground(UIManager.getColor("Label.foreground"));
+        } else if (comp instanceof JButton) {
+            JButton btn = (JButton) comp;
+            if ("Done".equals(btn.getText())) {
+                Color accent = UIManager.getColor("nimbusFocus");
+                if (accent == null && appController != null) {
+                    accent = appController.getThemeColor("ACCENT", new Color(60, 120, 220));
+                }
+                if (accent == null) accent = new Color(60, 120, 220);
+                btn.setBackground(accent);
+                btn.setForeground(Color.WHITE);
+            } else {
+                btn.setBackground(UIManager.getColor("Button.background"));
+                btn.setForeground(UIManager.getColor("Button.foreground"));
+            }
+        } else if (comp instanceof JTextField) {
+            comp.setBackground(UIManager.getColor("TextField.background"));
+            comp.setForeground(UIManager.getColor("TextField.foreground"));
+        } else if (comp instanceof JComboBox) {
+            comp.setBackground(UIManager.getColor("ComboBox.background"));
+            comp.setForeground(UIManager.getColor("ComboBox.foreground"));
+        } else if (comp instanceof JSlider) {
+            comp.setBackground(UIManager.getColor("Panel.background"));
+            comp.setForeground(UIManager.getColor("Label.foreground"));
+        }
+        if (comp instanceof Container) {
+            for (Component child : ((Container) comp).getComponents()) {
+                applyThemeRecursively(child);
+            }
+        }
+    }
+
+    public void updateDialogTheme() {
+        applyThemeRecursively(this);
+        this.revalidate();
+        this.repaint();
     }
 
     private String[] getAvailableThemes() {
         java.io.File themeDir = new java.io.File("data/.config/themes");
         String[] themes = themeDir.list((_, name) -> !name.startsWith(".") && !name.endsWith("~"));
         return themes != null ? themes : THEME_LABELS;
-    }
-
-    private void saveConfig() {
-        for (Map.Entry<String, JTextField> entry : fields.entrySet()) {
-            String key = entry.getKey();
-            JTextField field = entry.getValue();
-            Object sliderObj = field.getClientProperty("slider");
-            if (sliderObj instanceof JSlider) {
-                int v = ((JSlider) sliderObj).getValue();
-                if (key.equals("LIST_TERMINAL_DIVIDER")) {
-                    appController.setListTerminalDivider(v / 100.0);
-                } else if (key.equals("SIDEBAR_WIDTH")) {
-                    appController.setSidebarWidth(v);
-                } else if (key.equals("FILTER_WIDTH")) {
-                    appController.setFilterWidth(v);
-                } else if (key.equals("WINDOW_WIDTH")) {
-                    appController.setWindowWidth(v);
-                } else if (key.equals("WINDOW_HEIGHT")) {
-                    appController.setWindowHeight(v);
-                }
-            } else {
-                if (key.equals("THEME")) {
-                    appController.setThemeName(field.getText().trim());
-                }
-            }
-        }
-        if (themeCombo != null && themeCombo.getSelectedItem() != null) {
-            appController.setThemeName(themeCombo.getSelectedItem().toString());
-        }
-        appController.saveConfig(new File(configPath));
-        try {
-            UIManager.setLookAndFeel(new src.app.gui.CloudyLookAndFeel(appController.getThemeProperties()));
-            for (java.awt.Window window : java.awt.Window.getWindows()) {
-                javax.swing.SwingUtilities.updateComponentTreeUI(window);
-                window.invalidate();
-                window.validate();
-                window.repaint();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        if (personGui instanceof GuiAPI guiApi) {
-            guiApi.reloadConfigAndTheme();
-        }
-        JOptionPane.showMessageDialog(this, "Config saved and applied.");
-        // Don't dispose here; let user click Finish
-    }
-
-    // Add this method to update the dialog's theme colors
-    private void updateDialogTheme() {
-        Color bg = UIManager.getColor("Panel.background");
-        Color fg = UIManager.getColor("Label.foreground");
-        if (bg == null) bg = Color.WHITE;
-        if (fg == null) fg = Color.BLACK;
-        getContentPane().setBackground(bg);
-        for (Component c : getContentPane().getComponents()) {
-            updateComponentTreeColors(c, bg, fg);
-        }
-        repaint();
-    }
-
-    private void updateComponentTreeColors(Component comp, Color bg, Color fg) {
-        if (comp == null) return;
-        comp.setBackground(bg);
-        if (comp instanceof JLabel || comp instanceof JTextField || comp instanceof JComboBox) {
-            comp.setForeground(fg);
-        }
-        if (comp instanceof Container) {
-            for (Component child : ((Container) comp).getComponents()) {
-                updateComponentTreeColors(child, bg, fg);
-            }
-        }
-    }
-
-    // Live preview for dimension settings
-    private void applyLiveConfigPreview() {
-        // Use in-memory properties for instant preview
-        if (personGui instanceof Frame) {
-            ((Frame) personGui).applyLiveConfig(properties);
-        } else {
-            try {
-                java.lang.reflect.Method applyLive = personGui.getClass().getMethod("applyLiveConfig", Properties.class);
-                applyLive.invoke(personGui, properties);
-            } catch (Exception ex) { /* ignore */ }
-        }
     }
 }

@@ -1,8 +1,9 @@
 package src.app.gui;
 
 import src.app.AppController;
+import src.app.dialogs.Dialogs;
+
 import java.util.Properties;
-import javax.swing.UIManager;
 
 public class GUI implements GuiAPI {
     private final Frame frame;
@@ -15,46 +16,14 @@ public class GUI implements GuiAPI {
 
     @Override
     public void reloadConfigAndTheme() {
-        // Only update the UI, do NOT call appController.reloadConfigAndTheme()!
-        frame.getContentPane().removeAll();
-        frame.setupMenuBar();
-        frame.setupSplitPane();
-        frame.removeBordersRecursively(frame);
-        frame.getRootPane().setBorder(null);
-        frame.applyThemeFromThemes();
-        // --- Robust: update all windows, not just the main frame ---
-        applyThemeEverywhere();
-        javax.swing.SwingUtilities.invokeLater(() -> {
-            if (frame.getSplitPane() != null) frame.getSplitPane().setDividerLocation(appController.getSidebarWidth());
-            if (frame.getRightSplit() != null) frame.getRightSplit().setDividerLocation(appController.getListTerminalDivider());
-            if (frame.getFilterSplit() != null) frame.getFilterSplit().setDividerLocation(frame.getFilterSplit().getWidth() - appController.getFilterWidth());
-            frame.setSize(appController.getWindowWidth(), appController.getWindowHeight());
-        });
-    }
-
-    /**
-     * Robustly applies the current theme to all open windows and components.
-     */
-    private void applyThemeEverywhere() {
-        try {
-            // Only use CloudyLookAndFeel
-            UIManager.setLookAndFeel(new src.app.gui.CloudyLookAndFeel(appController.getThemeProperties()));
-        } catch (Exception ignored) {}
-        for (java.awt.Window window : java.awt.Window.getWindows()) {
-            javax.swing.SwingUtilities.updateComponentTreeUI(window);
-            window.invalidate();
-            window.validate();
-            window.repaint();
-        }
+        src.app.gui.Themes.applyThemeAndRefreshAllWindows(appController.getThemeProperties());
     }
 
     /**
      * Force a robust theme refresh after all UI is attached.
      */
     public void forceThemeRefresh() {
-        applyThemeEverywhere();
-        frame.revalidate();
-        frame.repaint();
+        src.app.gui.Themes.applyThemeAndRefreshAllWindows(appController.getThemeProperties());
     }
 
     @Override
@@ -73,8 +42,6 @@ public class GUI implements GuiAPI {
     @Override
     public javax.swing.JFrame getMainFrame() { return frame; }
     @Override
-    public MainBar getMainBar() { return frame.getMenuBarModule(); }
-    @Override
     public src.app.modules.list.PList getListModule() { return frame.getListModule(); }
     @Override
     public src.app.modules.filter.PFilter getFilterModule() { return frame.getFilterModule(); }
@@ -88,6 +55,4 @@ public class GUI implements GuiAPI {
     public void show() { frame.setVisible(true); }
     @Override
     public void hide() { frame.setVisible(false); }
-    @Override
-    public void refreshAllUI() { frame.refreshAllUI(); }
 }

@@ -1,4 +1,4 @@
-package src.app.gui;
+package src.app.dialogs;
 
 import src.app.AppController;
 import src.person.People;
@@ -1059,89 +1059,6 @@ public class Dialogs {
             return String.format("%.1f MB", size / (1024.0 * 1024));
         } else {
             return String.format("%.1f GB", size / (1024.0 * 1024 * 1024));
-        }
-    }
-
-    // Remove all direct data management. Only collect user input and call AppController methods.
-
-    // Example: Add Person dialog (pure UI)
-    public void showAddPersonDialog() {
-        String firstName = JOptionPane.showInputDialog(parentFrame, "Enter First Name:");
-        if (firstName == null || firstName.trim().isEmpty()) return;
-        String lastName = JOptionPane.showInputDialog(parentFrame, "Enter Last Name:");
-        if (lastName == null || lastName.trim().isEmpty()) return;
-        String dobStr = JOptionPane.showInputDialog(parentFrame, "Enter Date of Birth (MM/DD/YYYY):");
-        if (dobStr == null || dobStr.trim().isEmpty()) return;
-        String govID = JOptionPane.showInputDialog(parentFrame, "Enter Government ID (optional):");
-        String studentID = null;
-        if (govID != null && !govID.trim().isEmpty()) {
-            studentID = JOptionPane.showInputDialog(parentFrame, "Enter Student ID (optional):");
-        }
-        AppController.AddResult result = appController.addPersonFromFields(
-            firstName.trim(), lastName.trim(), dobStr.trim(),
-            govID != null ? govID.trim() : "", studentID != null ? studentID.trim() : ""
-        );
-        if (result.success) {
-            JOptionPane.showMessageDialog(parentFrame, "Person added successfully");
-        } else {
-            JOptionPane.showMessageDialog(parentFrame, result.errorMessage, "Error", JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    // Example: Edit Person dialog (pure UI)
-    public void showEditPersonDialog(Person person) {
-        if (person == null) return;
-        String firstName = JOptionPane.showInputDialog(parentFrame, "Enter First Name:", person.getFirstName());
-        if (firstName == null) return;
-        String lastName = JOptionPane.showInputDialog(parentFrame, "Enter Last Name:", person.getLastName());
-        if (lastName == null) return;
-        String dobStr = JOptionPane.showInputDialog(parentFrame, "Enter Date of Birth (MM/DD/YYYY):",
-            person.getDOB() != null ? String.format("%02d/%02d/%04d", person.getDOB().getMonthNumber(), person.getDOB().getDayOfMonth(), person.getDOB().getYear()) : "");
-        if (dobStr == null) return;
-        String govID = "";
-        String studentID = "";
-        if (person instanceof src.person.RegisteredPerson) {
-            src.person.RegisteredPerson rp = (src.person.RegisteredPerson) person;
-            govID = JOptionPane.showInputDialog(parentFrame, "Enter Government ID:", rp.getGovID());
-            if (govID == null) return;
-            if (person instanceof src.person.OCCCPerson) {
-                src.person.OCCCPerson op = (src.person.OCCCPerson) person;
-                studentID = JOptionPane.showInputDialog(parentFrame, "Enter Student ID:", op.getStudentID());
-                if (studentID == null) return;
-            }
-        }
-        int personIndex = -1;
-        for (int i = 0; i < appController.getPeople().size(); i++) {
-            if (appController.getPersonAt(i) == person) {
-                personIndex = i;
-                break;
-            }
-        }
-        if (personIndex == -1) {
-            JOptionPane.showMessageDialog(parentFrame, "Could not locate person in database", "Error", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-        AppController.AddResult result = appController.updatePersonFromFields(
-            personIndex, firstName.trim(), lastName.trim(), dobStr.trim(), govID.trim(), studentID.trim()
-        );
-        if (result.success) {
-            JOptionPane.showMessageDialog(parentFrame, "Person updated successfully");
-        } else {
-            JOptionPane.showMessageDialog(parentFrame, result.errorMessage, "Error", JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    // Example: Delete Person dialog (pure UI)
-    public void showDeletePersonDialog(Person person) {
-        if (person == null) return;
-        int confirm = JOptionPane.showConfirmDialog(parentFrame, "Are you sure you want to delete this person?", "Confirm Delete", JOptionPane.YES_NO_OPTION);
-        if (confirm == JOptionPane.YES_OPTION) {
-            boolean result = appController.deletePerson(person);
-            if (result) {
-                JOptionPane.showMessageDialog(parentFrame, "Person deleted successfully");
-            } else {
-                JOptionPane.showMessageDialog(parentFrame, "Failed to delete person", "Error", JOptionPane.ERROR_MESSAGE);
-            }
         }
     }
 }

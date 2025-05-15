@@ -14,5 +14,9 @@ public interface PViewer {
     Person getCurrentPerson();
     boolean hasPartialData();
     JPanel getPanel();
-    void addTextFieldChangeListener(PViewerFields.FieldChangeListener listener);
+    void addTextFieldChangeListener(FieldChangeListener listener);
+
+    interface FieldChangeListener {
+        void onFieldsChanged();
+    }
 }
