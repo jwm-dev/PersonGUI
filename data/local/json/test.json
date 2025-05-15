@@ -1,0 +1,43 @@
+{
+  "exportDate": "Tue May 13 19:53:34 CDT 2025",
+  "people": [
+    {
+      "firstName": "TEST",
+      "lastName": "PERSON A",
+      "dob": "01/01/0001",
+      "governmentID": "1",
+      "studentID": "A",
+      "type": "OCCCPerson"
+    },
+    {
+      "firstName": "TEST",
+      "lastName": "PERSON B",
+      "dob": "02/02/0002",
+      "governmentID": "2",
+      "studentID": "B",
+      "type": "OCCCPerson"
+    },
+    {
+      "firstName": "TEST",
+      "lastName": "PERSON C",
+      "dob": "03/03/0003",
+      "governmentID": "3",
+      "studentID": "C",
+      "type": "OCCCPerson"
+    },
+    {
+      "firstName": "TEST",
+      "lastName": "PERSON D",
+      "dob": "04/04/0004",
+      "type": "Person"
+    },
+    {
+      "firstName": "TEST",
+      "lastName": "PERSON E",
+      "dob": "05/05/0005",
+      "governmentID": "4",
+      "type": "RegisteredPerson"
+    }
+  ],
+  "total": 5
+}

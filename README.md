@@ -1,0 +1,9 @@
+# TO-DO
+1) Split the filter/list modules into APIs to reflect the same architecture the terminal, viewer, and GUI currently have
+2) Fix themeing. Trying to consolidate everything theme related into Themes.java under the GUI API but it still doesn't work.
+3) Fix the ConfigEditorDialog once themes are working correctly so that it has a live preview of selected themes and appropriately handles switching themes
+4) Possibly refactor GUI API into separate GUI and rendering components. Might be how to fix points 2 & 3. My knowledge of Java Swing is clearly kind of limited - it feels so much harder to get this working in Java vs just using egui in Rust or something!
+5) We have dedicated /ppl, /txt, and /json subdirectories in /data. We need to make sure that the terminal and all other things that interact with files are locked down to the internal data directory. The correct dialogues should open to the correct directories too. If I change my Export As... dialog box to .txt files, for example, it should automatically go to the data/txt directory **for the user**. We could allow the import functionality to be the only thing that ventures outside the project directory, this would be the safest option imo
+6) I was working on a scripting functionality but haven't touched it bc I got bogged down trying to detangle *why* themes aren't working as I intended... if we have time I will finish it out so the terminal or something can run scripts. Maybe provide an example webscraper script to make .ppl file from Wikipedia lists of people or something. Either way, secondary concern fs.
+7) Make sure all modules and data flow through AppController.java; the AppController needs to remain the ultimate source of truth for any of these changing/variable/moving components in the app. This way we have a state engine to keep things consistent.
+8) probably a ton of other stuff i'm not thinking of rn idk lmao

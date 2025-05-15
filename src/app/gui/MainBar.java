@@ -1,34 +1,61 @@
-package src.app;
+package src.app.gui;
 
 import javax.swing.*;
+
+import src.app.AppController;
+
 import java.awt.*;
 
 /**
  * A module that provides menu bar functionality for the Person Management application.
  */
-public class Bar {
+public class MainBar {
     private JFrame parentFrame;
-    private PersonManager guiModule;
-    private DataManager dataManager;
+    private Object reloadTarget;
+    private AppController dataManager;
     private JMenuItem saveItem, saveAsItem, exportAsItem;
+    // Menu action callbacks
+    private Runnable onNew, onOpen, onSave, onSaveAs, onExportAs, onImport;
+    private Color closeButtonColor = Color.RED; // Default, will be set by theme
     
     /**
      * Creates a menu bar module
-     * @param parent The parent JFrame
-     * @param module The GUI module that will handle menu actions
+     * @param parentFrame The JFrame instance
      * @param manager The data manager to check for save status
      */
-    public Bar(JFrame parent, PersonManager module, DataManager manager) {
-        this.parentFrame = parent;
-        this.guiModule = module;
+    public MainBar(JFrame parentFrame, AppController manager) {
+        this(parentFrame, manager, parentFrame);
+    }
+
+    /**
+     * Creates a menu bar module
+     * @param parentFrame The JFrame instance
+     * @param manager The data manager to check for save status
+     * @param reloadTarget The target object for hot reload
+     */
+    public MainBar(JFrame parentFrame, AppController manager, Object reloadTarget) {
+        this.parentFrame = parentFrame;
         this.dataManager = manager;
+        this.reloadTarget = reloadTarget;
+    }
+    
+    // Setters for menu action callbacks
+    public void setOnNew(Runnable onNew) { this.onNew = onNew; }
+    public void setOnOpen(Runnable onOpen) { this.onOpen = onOpen; }
+    public void setOnSave(Runnable onSave) { this.onSave = onSave; }
+    public void setOnSaveAs(Runnable onSaveAs) { this.onSaveAs = onSaveAs; }
+    public void setOnExportAs(Runnable onExportAs) { this.onExportAs = onExportAs; }
+    public void setOnImport(Runnable onImport) { this.onImport = onImport; }
+    
+    public void setThemeColors(Color closeButtonColor) {
+        this.closeButtonColor = closeButtonColor;
     }
     
     /**
      * Creates and returns the application menu bar
      * @return The configured JMenuBar
      */
-    public JMenuBar createMenuBar() {
+    public JMenuBar newMainBar() {
         JMenuBar menuBar = new JMenuBar();
         
         // File Menu
@@ -41,12 +68,12 @@ public class Bar {
         JMenuItem importItem = new JMenuItem("Import...");
         JMenuItem exitItem = new JMenuItem("Exit");
         
-        newItem.addActionListener(_ -> guiModule.doNew());
-        openItem.addActionListener(_ -> guiModule.doOpen());
-        saveItem.addActionListener(_ -> guiModule.doSave());
-        saveAsItem.addActionListener(_ -> guiModule.doSaveAs());
-        exportAsItem.addActionListener(_ -> guiModule.doExportAs());
-        importItem.addActionListener(_ -> guiModule.doImport());
+        newItem.addActionListener(_ -> { if (onNew != null) onNew.run(); });
+        openItem.addActionListener(_ -> { if (onOpen != null) onOpen.run(); });
+        saveItem.addActionListener(_ -> { if (onSave != null) onSave.run(); });
+        saveAsItem.addActionListener(_ -> { if (onSaveAs != null) onSaveAs.run(); });
+        exportAsItem.addActionListener(_ -> { if (onExportAs != null) onExportAs.run(); });
+        importItem.addActionListener(_ -> { if (onImport != null) onImport.run(); });
         // Updated to trigger unsaved changes check
         exitItem.addActionListener(_ -> {
             // Fire window closing event to trigger the same check as when clicking X
@@ -64,6 +91,43 @@ public class Bar {
         fileMenu.addSeparator();
         fileMenu.add(exitItem);
 
+        // Settings Menu
+        JMenu settingsMenu = new JMenu("Settings");
+        JMenuItem resetDefaultsItem = new JMenuItem("Reset to Default Settings");
+        JMenuItem editConfigItem = new JMenuItem("Edit Config...");
+        resetDefaultsItem.addActionListener(_ -> {
+            int confirm = JOptionPane.showConfirmDialog(parentFrame, "Are you sure you want to reset all settings to default?", "Reset Settings", JOptionPane.YES_NO_OPTION);
+            if (confirm == JOptionPane.YES_OPTION) {
+                try {
+                    java.nio.file.Files.copy(
+                        java.nio.file.Paths.get("data/.config/default"),
+                        java.nio.file.Paths.get("data/.config/config"),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                    );
+                    // Load the new config and theme from the default file
+                    java.util.Properties props = new java.util.Properties();
+                    try (java.io.FileInputStream fis = new java.io.FileInputStream("data/.config/config")) {
+                        props.load(fis);
+                    }
+                    dataManager.reloadConfigAndTheme();
+                    // Apply config and theme live
+                    dataManager.applyConfigAndTheme(props, () -> {
+                        if (reloadTarget instanceof GuiAPI guiApi) {
+                            guiApi.reloadConfigAndTheme();
+                        }
+                    });
+                    JOptionPane.showMessageDialog(parentFrame, "Settings reset to default and applied.");
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(parentFrame, "Failed to reset settings: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+        editConfigItem.addActionListener(_ -> {
+            new src.app.gui.ConfigEditorDialog(reloadTarget, parentFrame, "data/.config/config", dataManager).setVisible(true);
+        });
+        settingsMenu.add(resetDefaultsItem);
+        settingsMenu.add(editConfigItem);
+
         // Help Menu
         JMenu helpMenu = new JMenu("Help");
         JMenuItem aboutItem = new JMenuItem("About");
@@ -74,6 +138,7 @@ public class Bar {
         helpMenu.add(aboutItem);
         
         menuBar.add(fileMenu);
+        menuBar.add(settingsMenu);
         menuBar.add(helpMenu);
         
         // Add simple window control buttons to the right
@@ -96,7 +161,8 @@ public class Bar {
         }
         
         boolean hasData = !dataManager.getPeople().isEmpty();
-        boolean hasValidData = hasData && !guiModule.hasPartialData();
+        // For save validation, we need a way to check for partial data. We'll let the callback handle this.
+        boolean hasValidData = hasData; // The GUI will handle disabling if partial data
         boolean hasChanges = dataManager.hasChanges();
         boolean isFileOpen = dataManager.getCurrentFile() != null;
         
@@ -175,8 +241,8 @@ public class Bar {
             button.setFocusPainted(false);
         }
         
-        // Give the close button a distinctive color
-        closeButton.setForeground(Color.RED);
+        // Use theme color for close button
+        closeButton.setForeground(closeButtonColor);
         
         // Add buttons to panel
         controlsPanel.add(minimizeButton);
@@ -184,5 +250,26 @@ public class Bar {
         controlsPanel.add(closeButton);
         
         return controlsPanel;
+    }
+
+    // Add this method so AppController can trigger a theme/config refresh
+    public void refreshThemeAndConfig(AppController appController) {
+        // Always pull theme/config from AppController
+        java.util.Properties themeProps = appController.getThemeProperties();
+        Color closeButtonColor = Color.RED;
+        String closeColorStr = themeProps.getProperty("CLOSE_BUTTON_FG");
+        if (closeColorStr != null) {
+            try { closeButtonColor = Color.decode(closeColorStr); } catch (Exception ignored) {}
+        }
+        setThemeColors(closeButtonColor);
+        // Force menu bar and children to update if needed
+        // (Assume parentFrame is a Frame and will update the menu bar)
+        if (parentFrame instanceof JFrame frame) {
+            JMenuBar jmb = frame.getJMenuBar();
+            if (jmb != null) {
+                SwingUtilities.updateComponentTreeUI(jmb);
+                jmb.repaint();
+            }
+        }
     }
 }

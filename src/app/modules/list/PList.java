@@ -1,9 +1,11 @@
-package src.app;
+package src.app.modules.list;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableRowSorter;
 
+import src.app.AppController;
+import src.app.modules.viewer.PViewer;
 import src.date.OCCCDate;
 import src.person.OCCCPerson;
 import src.person.People;
@@ -14,25 +16,28 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import java.awt.*;
+import java.util.function.Predicate;
 
 /**
  * A module that displays all Person objects in a sortable table
  */
-public class DataList extends JPanel implements DataManager.DataChangeListener {
+public class PList extends JPanel implements AppController.DataChangeListener {
     private JTable personTable;
     private DefaultTableModel tableModel;
     private TableRowSorter<DefaultTableModel> sorter;
-    private DataManager dataManager;
-    private PersonManager personManager; // Reference to the person manager module
+    private AppController dataManager;
+    private PViewer personManager; // Reference to the person manager module
     private boolean ignoreSelectionEvents = false;
     private JLabel statusLabel; // Status label to show currently selected person
     private JLabel titleLabel; // Title label that will show the current file name
+    private java.util.List<Person> filteredPeople = null;
+    private Predicate<Person> currentFilter = null;
     
     /**
      * Creates a new List module
      * @param manager The data manager to use
      */
-    public DataList(DataManager manager) {
+    public PList(AppController manager) {
         this.dataManager = manager;
         
         // Register as a listener for data changes
@@ -43,7 +48,7 @@ public class DataList extends JPanel implements DataManager.DataChangeListener {
         
         // Create section title
         titleLabel = new JLabel("Person List");
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        titleLabel.setFont(UIManager.getFont("Label.font"));
         titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 5, 0));
         
         // Add title to the top of the panel
@@ -79,6 +84,7 @@ public class DataList extends JPanel implements DataManager.DataChangeListener {
         
         // Create the table with the model
         personTable = new JTable(tableModel);
+        personTable.setFont(UIManager.getFont("Table.font"));
         
         // Custom date renderer for proper date display
         personTable.setDefaultRenderer(OCCCDate.class, new DefaultTableCellRenderer() {
@@ -114,15 +120,15 @@ public class DataList extends JPanel implements DataManager.DataChangeListener {
                 Component c = super.getTableCellRendererComponent(
                     table, value, isSelected, hasFocus, row, column);
                 
-                // Apply stronger highlighting to selected rows
+                // Use theme colors only
                 if (isSelected) {
-                    c.setBackground(new Color(51, 153, 255)); // Bright blue background
-                    c.setForeground(Color.WHITE); // White text
-                    ((JLabel)c).setFont(new Font(getFont().getName(), Font.BOLD, getFont().getSize())); // Bold font
+                    c.setBackground(table.getSelectionBackground());
+                    c.setForeground(table.getSelectionForeground());
+                    c.setFont(c.getFont().deriveFont(Font.BOLD));
                 } else {
                     c.setBackground(table.getBackground());
                     c.setForeground(table.getForeground());
-                    ((JLabel)c).setFont(new Font(getFont().getName(), Font.PLAIN, getFont().getSize()));
+                    c.setFont(c.getFont().deriveFont(Font.PLAIN));
                 }
                 return c;
             }
@@ -198,12 +204,9 @@ public class DataList extends JPanel implements DataManager.DataChangeListener {
             } else if (person instanceof RegisteredPerson) {
                 personType = "Registered Person";
             }
-            
             statusLabel.setText("Selected: " + personType + " - " + person.getFirstName() + " " + person.getLastName());
-            statusLabel.setForeground(new Color(0, 100, 0)); // Dark green text
         } else {
             statusLabel.setText("No person selected");
-            statusLabel.setForeground(Color.BLACK);
         }
     }
     
@@ -266,14 +269,68 @@ public class DataList extends JPanel implements DataManager.DataChangeListener {
     }
     
     /**
+     * Apply a filter to the list and update the table
+     */
+    public void applyFilter(java.util.function.Predicate<Person> filter) {
+        this.currentFilter = filter;
+        People people = dataManager.getPeople();
+        filteredPeople = new java.util.ArrayList<>();
+        tableModel.setRowCount(0);
+        if (people != null) {
+            for (Person person : people) {
+                if (filter == null || filter.test(person)) {
+                    filteredPeople.add(person);
+                    String type = "Person";
+                    String govID = "-1";
+                    String studentID = "-1";
+                    if (person instanceof OCCCPerson) {
+                        type = "OCCC Person";
+                        govID = ((OCCCPerson) person).getGovID();
+                        studentID = ((OCCCPerson) person).getStudentID();
+                    } else if (person instanceof RegisteredPerson) {
+                        type = "Registered Person";
+                        govID = ((RegisteredPerson) person).getGovID();
+                    }
+                    tableModel.addRow(new Object[]{
+                        type,
+                        person.getFirstName(),
+                        person.getLastName(),
+                        person.getDOB(),
+                        person.getAge(),
+                        govID,
+                        studentID
+                    });
+                }
+            }
+        }
+        personTable.setEnabled(filteredPeople != null && !filteredPeople.isEmpty());
+    }
+
+    /**
+     * Get the currently filtered people as a People object
+     */
+    public People getFilteredPeople() {
+        People result = new People();
+        if (filteredPeople != null) {
+            for (Person p : filteredPeople) {
+                result.add(p);
+            }
+        }
+        return result;
+    }
+
+    /**
      * Implements DataChangeListener interface
      * Called when data in the DataManager changes
      */
     @Override
     public void onDataChanged() {
         // Update the list when data changes
-        refreshList();
-        
+        if (currentFilter != null) {
+            applyFilter(currentFilter);
+        } else {
+            refreshList();
+        }
         // Update the title to reflect the current file
         updateTitleLabel();
     }
@@ -282,7 +339,7 @@ public class DataList extends JPanel implements DataManager.DataChangeListener {
      * Sets the person manager reference
      * @param personManager The person manager to set
      */
-    public void setPersonManager(PersonManager personManager) {
+    public void setPersonManager(PViewer personManager) {
         this.personManager = personManager;
     }
     
@@ -332,7 +389,6 @@ public class DataList extends JPanel implements DataManager.DataChangeListener {
         try {
             personTable.clearSelection();
             statusLabel.setText("No person selected");
-            statusLabel.setForeground(Color.BLACK);
         } finally {
             ignoreSelectionEvents = false;
         }
@@ -347,51 +403,41 @@ public class DataList extends JPanel implements DataManager.DataChangeListener {
         boolean hasChanges = dataManager.hasChanges();
         
         if (currentFile != null) {
-            // Extract just the filename without path
             String fileName = currentFile.getName();
-            
-            // Add an asterisk to the end if the data has been modified
             if (isModified) {
                 fileName += " *";
             }
-            
             titleLabel.setText(fileName);
-            
-            // Make the title more noticeable
-            titleLabel.setForeground(new Color(0, 102, 153)); // Dark blue color
-            
-            // Set title to italic if data has been modified
             if (isModified) {
-                titleLabel.setFont(new Font(titleLabel.getFont().getName(), 
-                                           Font.ITALIC | Font.BOLD, 
-                                           titleLabel.getFont().getSize()));
+                titleLabel.setFont(UIManager.getFont("Label.font").deriveFont(Font.ITALIC | Font.BOLD));
             } else {
-                titleLabel.setFont(new Font(titleLabel.getFont().getName(), 
-                                           Font.BOLD, 
-                                           titleLabel.getFont().getSize()));
+                titleLabel.setFont(UIManager.getFont("Label.font").deriveFont(Font.BOLD));
             }
         } else {
-            // Default title when no file is loaded
             String defaultTitle = "Person List";
-            
-            // Only show "Unsaved List*" if there have actually been changes made
             if (isModified && hasChanges) {
                 defaultTitle = "Unsaved List*";
             }
-            
             titleLabel.setText(defaultTitle);
-            titleLabel.setForeground(Color.BLACK);
-            
-            // Set title to italic if data has been modified and has changes
             if (isModified && hasChanges) {
-                titleLabel.setFont(new Font(titleLabel.getFont().getName(), 
-                                          Font.ITALIC | Font.BOLD, 
-                                          titleLabel.getFont().getSize()));
+                titleLabel.setFont(UIManager.getFont("Label.font").deriveFont(Font.ITALIC | Font.BOLD));
             } else {
-                titleLabel.setFont(new Font(titleLabel.getFont().getName(), 
-                                          Font.BOLD, 
-                                          titleLabel.getFont().getSize()));
+                titleLabel.setFont(UIManager.getFont("Label.font").deriveFont(Font.BOLD));
             }
         }
+    }
+
+    /**
+     * Returns the JTable used in this list (for theming)
+     */
+    public JTable getJList() {
+        return personTable;
+    }
+
+    /**
+     * Returns the header label (for theming)
+     */
+    public JLabel getHeader() {
+        return titleLabel;
     }
 }
