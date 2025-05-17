@@ -882,12 +882,19 @@ public class PersonTerminalImpl extends JPanel implements PTerminal {
                 asciiPanel.setBackground(outputArea.getBackground());
                 asciiPanel.setForeground(outputArea.getForeground());
                 javax.swing.SwingUtilities.invokeAndWait(() -> {
+                    // Remove focus and caret from text components before removing them
+                    outputArea.setFocusable(false);
+                    inputField.setFocusable(false);
+                    if (outputArea.getCaret() != null) outputArea.getCaret().setVisible(false);
+                    if (inputField.getCaret() != null) inputField.getCaret().setVisible(false);
                     remove(cwdLabel);
                     remove(inputPanel);
                     remove(scrollPane);
                     add(asciiPanel, BorderLayout.CENTER);
                     revalidate();
                     repaint();
+                    asciiPanel.setFocusable(true);
+                    asciiPanel.requestFocusInWindow();
                 });
                 inputField.setEditable(false);
                 inputField.setText("");
