@@ -749,87 +749,140 @@ public class Frame extends JFrame {
     // --- Custom window resizing for undecorated frame ---
     private static final int RESIZE_MARGIN = 6;
     private void enableWindowResizing() {
+        JComponent glass = (JComponent) getRootPane().getGlassPane();
+        glass.setOpaque(false);
+        glass.setCursor(Cursor.getDefaultCursor());
         MouseAdapter resizeListener = new MouseAdapter() {
             private int cursorType = Cursor.DEFAULT_CURSOR;
             private Point startPt = null;
             private Rectangle startBounds = null;
+            private boolean resizing = false;
+            private boolean isInResizeZone(MouseEvent e) {
+                int w = getWidth(), h = getHeight();
+                int x = e.getX(), y = e.getY();
+                return x < RESIZE_MARGIN || x > w - RESIZE_MARGIN || y < RESIZE_MARGIN || y > h - RESIZE_MARGIN;
+            }
             @Override
             public void mouseMoved(MouseEvent e) {
                 int w = getWidth(), h = getHeight();
                 int x = e.getX(), y = e.getY();
                 int c = Cursor.DEFAULT_CURSOR;
-                if (x < RESIZE_MARGIN && y < RESIZE_MARGIN) c = Cursor.NW_RESIZE_CURSOR;
-                else if (x > w - RESIZE_MARGIN && y < RESIZE_MARGIN) c = Cursor.NE_RESIZE_CURSOR;
-                else if (x < RESIZE_MARGIN && y > h - RESIZE_MARGIN) c = Cursor.SW_RESIZE_CURSOR;
-                else if (x > w - RESIZE_MARGIN && y > h - RESIZE_MARGIN) c = Cursor.SE_RESIZE_CURSOR;
-                else if (x < RESIZE_MARGIN) c = Cursor.W_RESIZE_CURSOR;
-                else if (x > w - RESIZE_MARGIN) c = Cursor.E_RESIZE_CURSOR;
-                else if (y < RESIZE_MARGIN) c = Cursor.N_RESIZE_CURSOR;
-                else if (y > h - RESIZE_MARGIN) c = Cursor.S_RESIZE_CURSOR;
-                setCursor(Cursor.getPredefinedCursor(c));
+                boolean inResize = false;
+                if (x < RESIZE_MARGIN && y < RESIZE_MARGIN) { c = Cursor.NW_RESIZE_CURSOR; inResize = true; }
+                else if (x > w - RESIZE_MARGIN && y < RESIZE_MARGIN) { c = Cursor.NE_RESIZE_CURSOR; inResize = true; }
+                else if (x < RESIZE_MARGIN && y > h - RESIZE_MARGIN) { c = Cursor.SW_RESIZE_CURSOR; inResize = true; }
+                else if (x > w - RESIZE_MARGIN && y > h - RESIZE_MARGIN) { c = Cursor.SE_RESIZE_CURSOR; inResize = true; }
+                else if (x < RESIZE_MARGIN) { c = Cursor.W_RESIZE_CURSOR; inResize = true; }
+                else if (x > w - RESIZE_MARGIN) { c = Cursor.E_RESIZE_CURSOR; inResize = true; }
+                else if (y < RESIZE_MARGIN) { c = Cursor.N_RESIZE_CURSOR; inResize = true; }
+                else if (y > h - RESIZE_MARGIN) { c = Cursor.S_RESIZE_CURSOR; inResize = true; }
+                glass.setCursor(Cursor.getPredefinedCursor(c));
                 cursorType = c;
+                glass.setVisible(inResize);
+            }
+            @Override
+            public void mouseExited(MouseEvent e) {
+                if (!resizing) glass.setVisible(false);
             }
             @Override
             public void mousePressed(MouseEvent e) {
-                startPt = e.getPoint();
-                startBounds = getBounds();
+                if (isInResizeZone(e)) {
+                    resizing = true;
+                    startPt = e.getPoint();
+                    startBounds = getBounds();
+                } else {
+                    glass.setVisible(false);
+                    redispatchToContent(e);
+                }
             }
             @Override
             public void mouseDragged(MouseEvent e) {
-                if (startPt == null || startBounds == null) return;
-                int dx = e.getX() - startPt.x;
-                int dy = e.getY() - startPt.y;
-                Rectangle newBounds = new Rectangle(startBounds);
-                switch (cursorType) {
-                    case Cursor.E_RESIZE_CURSOR:
-                        newBounds.width += dx;
-                        break;
-                    case Cursor.S_RESIZE_CURSOR:
-                        newBounds.height += dy;
-                        break;
-                    case Cursor.SE_RESIZE_CURSOR:
-                        newBounds.width += dx;
-                        newBounds.height += dy;
-                        break;
-                    case Cursor.W_RESIZE_CURSOR:
-                        newBounds.x += dx;
-                        newBounds.width -= dx;
-                        break;
-                    case Cursor.N_RESIZE_CURSOR:
-                        newBounds.y += dy;
-                        newBounds.height -= dy;
-                        break;
-                    case Cursor.NE_RESIZE_CURSOR:
-                        newBounds.y += dy;
-                        newBounds.height -= dy;
-                        newBounds.width += dx;
-                        break;
-                    case Cursor.NW_RESIZE_CURSOR:
-                        newBounds.x += dx;
-                        newBounds.width -= dx;
-                        newBounds.y += dy;
-                        newBounds.height -= dy;
-                        break;
-                    case Cursor.SW_RESIZE_CURSOR:
-                        newBounds.x += dx;
-                        newBounds.width -= dx;
-                        newBounds.height += dy;
-                        break;
-                    default:
-                        return;
+                if (resizing && startPt != null && startBounds != null) {
+                    int dx = e.getX() - startPt.x;
+                    int dy = e.getY() - startPt.y;
+                    Rectangle newBounds = new Rectangle(startBounds);
+                    switch (cursorType) {
+                        case Cursor.E_RESIZE_CURSOR:
+                            newBounds.width += dx;
+                            break;
+                        case Cursor.S_RESIZE_CURSOR:
+                            newBounds.height += dy;
+                            break;
+                        case Cursor.SE_RESIZE_CURSOR:
+                            newBounds.width += dx;
+                            newBounds.height += dy;
+                            break;
+                        case Cursor.W_RESIZE_CURSOR:
+                            newBounds.x += dx;
+                            newBounds.width -= dx;
+                            break;
+                        case Cursor.N_RESIZE_CURSOR:
+                            newBounds.y += dy;
+                            newBounds.height -= dy;
+                            break;
+                        case Cursor.NE_RESIZE_CURSOR:
+                            newBounds.y += dy;
+                            newBounds.height -= dy;
+                            newBounds.width += dx;
+                            break;
+                        case Cursor.NW_RESIZE_CURSOR:
+                            newBounds.x += dx;
+                            newBounds.width -= dx;
+                            newBounds.y += dy;
+                            newBounds.height -= dy;
+                            break;
+                        case Cursor.SW_RESIZE_CURSOR:
+                            newBounds.x += dx;
+                            newBounds.width -= dx;
+                            newBounds.height += dy;
+                            break;
+                        default:
+                            return;
+                    }
+                    if (newBounds.width < getMinimumSize().width) newBounds.width = getMinimumSize().width;
+                    if (newBounds.height < getMinimumSize().height) newBounds.height = getMinimumSize().height;
+                    setBounds(newBounds);
+                } else {
+                    glass.setVisible(false);
+                    redispatchToContent(e);
                 }
-                // Minimum size
-                if (newBounds.width < getMinimumSize().width) newBounds.width = getMinimumSize().width;
-                if (newBounds.height < getMinimumSize().height) newBounds.height = getMinimumSize().height;
-                setBounds(newBounds);
             }
             @Override
             public void mouseReleased(MouseEvent e) {
+                resizing = false;
                 startPt = null;
                 startBounds = null;
+                glass.setVisible(false);
+                if (!isInResizeZone(e)) redispatchToContent(e);
+            }
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (!isInResizeZone(e)) redispatchToContent(e);
+            }
+            private void redispatchToContent(MouseEvent e) {
+                Point glassPt = e.getPoint();
+                Container content = getContentPane();
+                Point containerPt = SwingUtilities.convertPoint(glass, glassPt, content);
+                Component target = SwingUtilities.getDeepestComponentAt(content, containerPt.x, containerPt.y);
+                if (target != null) {
+                    MouseEvent newEvent = SwingUtilities.convertMouseEvent(glass, e, target);
+                    target.dispatchEvent(newEvent);
+                }
             }
         };
-        this.addMouseListener(resizeListener);
-        this.addMouseMotionListener(resizeListener);
+        // Attach the listener to all relevant panes and bars for reliable resize detection
+        getRootPane().addMouseMotionListener(resizeListener);
+        getRootPane().addMouseListener(resizeListener);
+        mainPanel.addMouseMotionListener(resizeListener);
+        mainPanel.addMouseListener(resizeListener);
+        if (getJMenuBar() != null) {
+            getJMenuBar().addMouseMotionListener(resizeListener);
+            getJMenuBar().addMouseListener(resizeListener);
+        }
+        getLayeredPane().addMouseMotionListener(resizeListener);
+        getLayeredPane().addMouseListener(resizeListener);
+        glass.addMouseListener(resizeListener);
+        glass.addMouseMotionListener(resizeListener);
+        glass.setVisible(false);
     }
 }
