@@ -228,6 +228,8 @@ public class PersonListImpl extends JPanel implements PList, AppController.DataC
                     });
                 }
             }
+            personTable.revalidate();
+            personTable.repaint();
         });
     }
 
@@ -270,6 +272,8 @@ public class PersonListImpl extends JPanel implements PList, AppController.DataC
             }
         }
         personTable.setEnabled(filteredPeople != null && !filteredPeople.isEmpty());
+        personTable.revalidate();
+        personTable.repaint();
     }
 
     @Override
@@ -518,9 +522,9 @@ public class PersonListImpl extends JPanel implements PList, AppController.DataC
                     restartFadeOutDebounce();
                 });
                 scrollbar.addHierarchyListener(e -> {
-                    if ((e.getChangeFlags() & java.awt.event.HierarchyEvent.SHOWING_CHANGED) != 0 && scrollbar.isShowing()) {
+                    if (scrollbar != null && (e.getChangeFlags() & java.awt.event.HierarchyEvent.SHOWING_CHANGED) != 0 && scrollbar.isShowing()) {
                         fade = 0.0f;
-                        if (scrollbar != null) scrollbar.repaint();
+                        scrollbar.repaint();
                     }
                 });
             }

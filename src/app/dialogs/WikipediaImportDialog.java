@@ -392,53 +392,55 @@ public class WikipediaImportDialog extends JDialog {
                     }
                 }
                 // --- Birthday (P569) ---
-                int p569Idx = json.indexOf("\"P569\""); // search anywhere in JSON
-                if (p569Idx != -1) {
-                    // Search for '"time"' within the next 2000 characters after P569
-                    int searchWindow = Math.min(json.length(), p569Idx + 2000);
-                    int timeIdx = json.indexOf("\"time\"", p569Idx);
-                    if (timeIdx != -1 && timeIdx < searchWindow) {
-                        int colon = json.indexOf(':', timeIdx);
-                        int quote1 = json.indexOf('"', colon + 1);
-                        int quote2 = json.indexOf('"', quote1 + 1);
-                        if (quote1 != -1 && quote2 != -1) {
-                            String time = json.substring(quote1 + 1, quote2); // e.g. +1984-05-14T00:00:00Z
-                            if (time.length() >= 11 && time.charAt(0) == '+') {
-                                try {
-                                    int year = Integer.parseInt(time.substring(1, 5));
-                                    String monthStr = time.substring(6, 8);
-                                    String dayStr = time.substring(9, 11);
-                                    int month = Integer.parseInt(monthStr);
-                                    int day = Integer.parseInt(dayStr);
-                                    // Sanitize placeholder values from Wikidata
-                                    if (month == 0 || monthStr.equals("00") || monthStr.equals("01")) month = 1;
-                                    if (day == 0 || dayStr.equals("00") || dayStr.equals("01")) day = 1;
-                                    // If the date is 1/1/YYYY, treat as unknown/null
-                                    if (month == 1 && day == 1) {
-                                        dob = new OCCCDate(1, 1, 1);
-                                    } else {
-                                        dob = new OCCCDate(day, month, year);
-                                    }
-                                    logger.accept("Wikidata birthdate: " + year + "-" + month + "-" + day);
-                                } catch (Exception parseEx) {
-                                    logger.accept("Wikidata date parse error: " + parseEx.getMessage());
+                int claimsIdx = json.indexOf("\"claims\"");
+                if (claimsIdx != -1) {
+                    // Find the P569 array inside claims
+                    Pattern p569ArrayPattern = Pattern.compile("\\\"P569\\\"\\s*:\\s*(\\[.*?\\])", Pattern.DOTALL);
+                    Matcher p569ArrayMatcher = p569ArrayPattern.matcher(json.substring(claimsIdx));
+                    if (p569ArrayMatcher.find()) {
+                        String p569Array = p569ArrayMatcher.group(1);
+                        // Now find all '"time":"+YYYY-MM-DD' inside this array
+                        Pattern timePattern = Pattern.compile("\"time\"\\s*:\\s*\"([+\\-]\\d{4}-\\d{2}-\\d{2})T");
+                        Matcher m = timePattern.matcher(p569Array);
+                        boolean found = false;
+                        while (m.find()) {
+                            String time = m.group(1); // e.g. +1906-04-28
+                            try {
+                                int year = Integer.parseInt(time.substring(1, 5));
+                                int month = Integer.parseInt(time.substring(6, 8));
+                                int day = Integer.parseInt(time.substring(9, 11));
+                                // Sanitize placeholder values from Wikidata
+                                if (month == 0) month = 1;
+                                if (day == 0) day = 1;
+                                // If the date is 1/1/YYYY, treat as unknown/null
+                                if (month == 1 && day == 1) {
+                                    dob = new OCCCDate(1, 1, 1);
+                                } else {
+                                    dob = new OCCCDate(day, month, year);
                                 }
-                            } else {
-                                logger.accept("Wikidata time format invalid: " + time);
+                                logger.accept("Wikidata birthdate: " + year + "-" + month + "-" + day);
+                                found = true;
+                                break; // Use the first valid date
+                            } catch (Exception parseEx) {
+                                logger.accept("Wikidata date parse error: " + parseEx.getMessage());
                             }
                         }
+                        if (!found) {
+                            logger.accept("No valid 'time' field found for P569");
+                            logger.accept("Wikidata P569 array snippet: " + p569Array.substring(0, Math.min(p569Array.length(), 500)));
+                        }
                     } else {
-                        logger.accept("No 'time' field found for P569");
-                        logger.accept("Wikidata JSON snippet: " + json.substring(Math.max(0, p569Idx - 200), Math.min(json.length(), p569Idx + 2000)));
+                        logger.accept("No P569 (birthdate) property found");
+                        logger.accept("Wikidata claims snippet: " + json.substring(claimsIdx, Math.min(json.length(), claimsIdx + 2000)));
                     }
                 } else {
-                    logger.accept("No P569 (birthdate) property found");
+                    logger.accept("No claims object found in Wikidata JSON");
                     logger.accept("Wikidata JSON snippet: " + json.substring(0, Math.min(json.length(), 2000)));
                 }
                 // --- Tags (occupations, P106) ---
                 Set<String> occIds = new LinkedHashSet<>();
-                int claimsIdx = json.indexOf("\"claims\"", entityIdx);
-                int p106Idx = json.indexOf("\"P106\"", claimsIdx);
+                int claimsIdxForTags = json.indexOf("\"claims\"", entityIdx);
+                int p106Idx = json.indexOf("\"P106\"", claimsIdxForTags);
                 if (p106Idx != -1) {
                     int searchIdx = p106Idx;
                     while (true) {
@@ -529,7 +531,7 @@ public class WikipediaImportDialog extends JDialog {
         }
         appController.notifyDataChanged();
         JOptionPane.showMessageDialog(this, imported + " people imported.", "Import Complete", JOptionPane.INFORMATION_MESSAGE);
-        dispose();
+        SwingUtilities.invokeLater(() -> dispose());
     }
 
     private void doExport() {

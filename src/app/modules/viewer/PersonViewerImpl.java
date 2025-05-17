@@ -53,7 +53,7 @@ public class PersonViewerImpl implements PViewer {
         this.studentIDField = new JTextField();
         this.tagsField = new JTextField();
         this.descArea = new JTextArea();
-        this.govIDLabel = new JLabel("Gov ID");
+        this.govIDLabel = new JLabel("Government ID");
         this.studentIDLabel = new JLabel("Student ID");
 
         this.panel = new PersonViewerPanel(new BorderLayout()) {
@@ -123,7 +123,7 @@ public class PersonViewerImpl implements PViewer {
         gbc.gridy++;
         fieldsPanel.add(lastNameField, gbc);
         gbc.gridy++;
-        JLabel dobLabel = new JLabel("DOB");
+        JLabel dobLabel = new JLabel("Date of Birth");
         dobLabel.setForeground(UIManager.getColor("Viewer.foreground"));
         fieldsPanel.add(dobLabel, gbc);
         gbc.gridy++;
@@ -154,7 +154,7 @@ public class PersonViewerImpl implements PViewer {
         mGbc.weightx = 1.0;
         mGbc.fill = GridBagConstraints.HORIZONTAL;
         mGbc.insets = new Insets(0, 0, 2, 0);
-        JLabel descLabel = new JLabel("Desc.");
+        JLabel descLabel = new JLabel("Description");
         descLabel.setForeground(UIManager.getColor("Viewer.foreground"));
         metaPanel.add(descLabel, mGbc);
         mGbc.gridy++;

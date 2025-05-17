@@ -130,10 +130,6 @@ public class Frame extends JFrame {
         JPanel controlsPanel = new JPanel();
         controlsPanel.setLayout(new BoxLayout(controlsPanel, BoxLayout.X_AXIS));
         controlsPanel.setOpaque(false);
-        // Remove fixed width constraints so panel can hug the right edge
-        // controlsPanel.setPreferredSize(new Dimension(90, barHeight));
-        // controlsPanel.setMaximumSize(new Dimension(90, barHeight));
-        // controlsPanel.setMinimumSize(new Dimension(90, barHeight));
         WindowControlButton minimizeButton = new WindowControlButton(WindowControlButton.Type.MINIMIZE, barHeight);
         WindowControlButton maximizeButton = new WindowControlButton(WindowControlButton.Type.MAXIMIZE, barHeight);
         WindowControlButton closeButton = new WindowControlButton(WindowControlButton.Type.CLOSE, barHeight);
@@ -141,9 +137,17 @@ public class Frame extends JFrame {
         maximizeButton.setToolTipText("Maximize/Restore");
         closeButton.setToolTipText("Close");
         minimizeButton.addActionListener(_ -> setState(Frame.ICONIFIED));
-        maximizeButton.addActionListener(_ -> setState(getState() == Frame.MAXIMIZED_BOTH ? Frame.NORMAL : Frame.MAXIMIZED_BOTH));
+        maximizeButton.addActionListener(_ -> {
+            int state = getExtendedState();
+            if ((state & Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH) {
+                setExtendedState(Frame.NORMAL);
+            } else {
+                setExtendedState(Frame.MAXIMIZED_BOTH);
+            }
+            revalidate();
+            repaint();
+        });
         closeButton.addActionListener(_ -> dispatchEvent(new java.awt.event.WindowEvent(this, java.awt.event.WindowEvent.WINDOW_CLOSING)));
-        // Reduce struts to minimum for edge alignment
         controlsPanel.add(Box.createHorizontalStrut(6));
         controlsPanel.add(minimizeButton);
         controlsPanel.add(Box.createHorizontalStrut(10));
@@ -157,6 +161,7 @@ public class Frame extends JFrame {
     // Remove all module instantiations from Frame constructor
     public Frame(AppController appController) {
         super("Person Manager");
+        setUndecorated(true); // Remove OS window decorations before showing UI
         this.appController = appController;
         this.mainPanel = new JPanel(new BorderLayout()) {
             @Override
