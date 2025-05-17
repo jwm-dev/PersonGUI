@@ -279,24 +279,30 @@ public class Dialogs {
         if (file == null) {
             throw new IllegalArgumentException("File cannot be null");
         }
-        
         String fileName = file.getName().toLowerCase();
+        src.person.People loaded;
         if (fileName.endsWith(".txt")) {
-            return loadPeopleFromTextFile(file);
+            loaded = loadPeopleFromTextFile(file);
         } else if (fileName.endsWith(".json")) {
-            return loadPeopleFromJsonFile(file);
+            loaded = loadPeopleFromJsonFile(file);
         } else {
             // Default .ser format
             try (FileInputStream fis = new FileInputStream(file);
                  ObjectInputStream ois = new ObjectInputStream(fis)) {
                 Object obj = ois.readObject();
                 if (obj instanceof src.person.People) {
-                    return (src.person.People) obj;
+                    loaded = (src.person.People) obj;
                 } else {
                     throw new ClassCastException("File does not contain a valid People object");
                 }
             }
         }
+        // Ensure all entries are PersonMeta (not raw Person)
+        src.person.People result = new src.person.People();
+        for (src.person.Person p : loaded) {
+            result.add(p); // always wraps in PersonMeta
+        }
+        return result;
     }
 
     public static src.person.People loadPeopleFromTextFile(File file) throws IOException {
@@ -393,7 +399,12 @@ public class Dialogs {
             }
         }
         
-        return people;
+        // After reading all people, ensure all are PersonMeta
+        src.person.People result = new src.person.People();
+        for (src.person.Person p : people) {
+            result.add(p);
+        }
+        return result;
     }
 
     public static src.person.People loadPeopleFromJsonFile(File file) throws IOException {
@@ -459,7 +470,12 @@ public class Dialogs {
             }
         }
         
-        return people;
+        // After reading all people, ensure all are PersonMeta
+        src.person.People result = new src.person.People();
+        for (src.person.Person p : people) {
+            result.add(p);
+        }
+        return result;
     }
 
     private static String extractJsonValue(String json, String key) {
@@ -767,7 +783,13 @@ public class Dialogs {
                 }
             }
         }
-        return people;
+        
+        // After reading all people, ensure all are PersonMeta
+        src.person.People result = new src.person.People();
+        for (src.person.Person p : people) {
+            result.add(p);
+        }
+        return result;
     }
     
     private static void parseJsonPerson(String json, src.person.People people) {

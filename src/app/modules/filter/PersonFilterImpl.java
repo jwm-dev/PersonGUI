@@ -10,6 +10,7 @@ import src.person.Person;
 import src.app.dialogs.Dialogs;
 import src.app.modules.list.PList;
 import src.person.People;
+import src.app.gui.FlatButton;
 
 public class PersonFilterImpl extends JPanel implements PFilter {
     private final JTextField searchField;
@@ -69,12 +70,12 @@ public class PersonFilterImpl extends JPanel implements PFilter {
         buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
         buttonPanel.setBackground(UIManager.getColor("Filter.background"));
         buttonPanel.setForeground(UIManager.getColor("Filter.foreground"));
-        clearButton = new JButton("Clear");
+        clearButton = new FlatButton("Clear");
         clearButton.setAlignmentX(Component.CENTER_ALIGNMENT);
         clearButton.setMaximumSize(new Dimension(160, fieldHeight));
         clearButton.setBackground(UIManager.getColor("Filter.buttonBackground"));
         clearButton.setForeground(UIManager.getColor("Filter.buttonForeground"));
-        exportButton = new JButton("Export Filtered");
+        exportButton = new FlatButton("Export Filtered");
         exportButton.setAlignmentX(Component.CENTER_ALIGNMENT);
         exportButton.setMaximumSize(new Dimension(160, fieldHeight));
         exportButton.setBackground(UIManager.getColor("Filter.buttonBackground"));

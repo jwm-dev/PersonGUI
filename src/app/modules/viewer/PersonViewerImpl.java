@@ -7,6 +7,7 @@ import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 import src.app.AppController;
+import src.app.gui.FlatButton;
 import src.app.modules.list.PList;
 import src.date.OCCCDate;
 import src.person.OCCCPerson;
@@ -18,8 +19,15 @@ import src.person.RegisteredPerson;
  */
 public class PersonViewerImpl implements PViewer {
     private final JPanel panel;
-    private final JTextField firstNameField, lastNameField, govIDField, studentIDField, dobField;
-    private final JLabel govIDLabel, studentIDLabel;
+    private final JTextField firstNameField;
+    private final JTextField lastNameField;
+    private final JTextField govIDField;
+    private final JTextField studentIDField;
+    private final JTextField dobField;
+    private final JTextField tagsField;
+    private final JTextArea descArea;
+    private final JLabel govIDLabel;
+    private final JLabel studentIDLabel;
     private final JButton addButton, updateButton, deleteButton;
     private final AppController appController;
     private final JFrame parent;
@@ -29,16 +37,26 @@ public class PersonViewerImpl implements PViewer {
     private String originalFirstName, originalLastName, originalDob, originalGovID, originalStudentID;
     private PList dataList;
 
-    private final List<FieldChangeListener> fieldChangeListeners = new ArrayList<>();
+    private JScrollPane descScroll;
 
-    public interface FieldChangeListener {
-        void onFieldsChanged();
-    }
+    private final List<FieldChangeListener> fieldChangeListeners = new ArrayList<>();
 
     public PersonViewerImpl(JFrame parent, AppController manager) {
         this.parent = parent;
         this.appController = manager;
-        this.panel = new JPanel(new BorderLayout()) {
+
+        // Initialize all final fields before use
+        this.firstNameField = new JTextField();
+        this.lastNameField = new JTextField();
+        this.dobField = new JTextField();
+        this.govIDField = new JTextField();
+        this.studentIDField = new JTextField();
+        this.tagsField = new JTextField();
+        this.descArea = new JTextArea();
+        this.govIDLabel = new JLabel("Gov ID");
+        this.studentIDLabel = new JLabel("Student ID");
+
+        this.panel = new PersonViewerPanel(new BorderLayout()) {
             @Override
             public void updateUI() {
                 super.updateUI();
@@ -50,6 +68,16 @@ public class PersonViewerImpl implements PViewer {
                 if (firstNameField != null && lastNameField != null && dobField != null && govIDField != null && studentIDField != null) {
                     updateFieldStates();
                     highlightEditFields(!creationMode && currentPerson != null);
+                }
+                // Explicitly re-theme the description area and its scroll pane
+                if (descArea != null) {
+                    descArea.setBackground(UIManager.getColor("Viewer.fieldBackground"));
+                    descArea.setForeground(UIManager.getColor("Viewer.fieldForeground"));
+                    descArea.setBorder(UIManager.getBorder("TextField.border"));
+                    if (descArea.getParent() instanceof JScrollPane descScroll) {
+                        descScroll.setBackground(UIManager.getColor("Viewer.fieldBackground"));
+                        descScroll.setForeground(UIManager.getColor("Viewer.fieldForeground"));
+                    }
                 }
             }
             private void updateComponentThemeRecursively(Component comp) {
@@ -72,96 +100,126 @@ public class PersonViewerImpl implements PViewer {
             }
         };
         panel.setBackground(UIManager.getColor("Viewer.background"));
-        // UI construction (from PViewerPanel)
+        // --- Main fields panel (top-aligned) ---
         JPanel fieldsPanel = new JPanel();
-        fieldsPanel.setLayout(new BoxLayout(fieldsPanel, BoxLayout.Y_AXIS));
+        fieldsPanel.setLayout(new GridBagLayout());
         fieldsPanel.setBorder(BorderFactory.createEmptyBorder(10, 6, 0, 6));
         fieldsPanel.setBackground(UIManager.getColor("Viewer.background"));
-        int fieldHeight = 22;
-        int fieldWidth = 150;
-        Dimension fieldDim = new Dimension(fieldWidth, fieldHeight);
-        Dimension labelDim = new Dimension(fieldWidth, fieldHeight);
-        fieldsPanel.add(Box.createVerticalStrut(4));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.weightx = 1.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.insets = new Insets(0, 0, 2, 0);
         JLabel firstNameLabel = new JLabel("First Name");
-        firstNameLabel.setAlignmentX(JLabel.LEFT_ALIGNMENT);
-        firstNameLabel.setMaximumSize(labelDim);
         firstNameLabel.setForeground(UIManager.getColor("Viewer.foreground"));
-        fieldsPanel.add(firstNameLabel);
-        firstNameField = new JTextField();
-        firstNameField.setMaximumSize(fieldDim);
-        firstNameField.setAlignmentX(JTextField.LEFT_ALIGNMENT);
-        firstNameField.setBackground(UIManager.getColor("Viewer.fieldBackground"));
-        firstNameField.setForeground(UIManager.getColor("Viewer.fieldForeground"));
-        fieldsPanel.add(firstNameField);
-        fieldsPanel.add(Box.createVerticalStrut(4));
+        fieldsPanel.add(firstNameLabel, gbc);
+        gbc.gridy++;
+        fieldsPanel.add(firstNameField, gbc);
+        gbc.gridy++;
         JLabel lastNameLabel = new JLabel("Last Name");
-        lastNameLabel.setAlignmentX(JLabel.LEFT_ALIGNMENT);
-        lastNameLabel.setMaximumSize(labelDim);
         lastNameLabel.setForeground(UIManager.getColor("Viewer.foreground"));
-        fieldsPanel.add(lastNameLabel);
-        lastNameField = new JTextField();
-        lastNameField.setMaximumSize(fieldDim);
-        lastNameField.setAlignmentX(JTextField.LEFT_ALIGNMENT);
-        lastNameField.setBackground(UIManager.getColor("Viewer.fieldBackground"));
-        lastNameField.setForeground(UIManager.getColor("Viewer.fieldForeground"));
-        fieldsPanel.add(lastNameField);
-        fieldsPanel.add(Box.createVerticalStrut(4));
+        fieldsPanel.add(lastNameLabel, gbc);
+        gbc.gridy++;
+        fieldsPanel.add(lastNameField, gbc);
+        gbc.gridy++;
         JLabel dobLabel = new JLabel("DOB");
-        dobLabel.setAlignmentX(JLabel.LEFT_ALIGNMENT);
-        dobLabel.setMaximumSize(labelDim);
         dobLabel.setForeground(UIManager.getColor("Viewer.foreground"));
-        fieldsPanel.add(dobLabel);
-        dobField = new JTextField();
-        dobField.setMaximumSize(fieldDim);
-        dobField.setAlignmentX(JTextField.LEFT_ALIGNMENT);
-        dobField.setBackground(UIManager.getColor("Viewer.fieldBackground"));
-        dobField.setForeground(UIManager.getColor("Viewer.fieldForeground"));
-        fieldsPanel.add(dobField);
-        fieldsPanel.add(Box.createVerticalStrut(4));
-        govIDLabel = new JLabel("Gov. ID");
-        govIDLabel.setAlignmentX(JLabel.LEFT_ALIGNMENT);
-        govIDLabel.setMaximumSize(labelDim);
+        fieldsPanel.add(dobLabel, gbc);
+        gbc.gridy++;
+        fieldsPanel.add(dobField, gbc);
+        gbc.gridy++;
         govIDLabel.setForeground(UIManager.getColor("Viewer.foreground"));
-        fieldsPanel.add(govIDLabel);
-        govIDField = new JTextField();
-        govIDField.setMaximumSize(fieldDim);
-        govIDField.setAlignmentX(JTextField.LEFT_ALIGNMENT);
-        govIDField.setBackground(UIManager.getColor("Viewer.fieldBackground"));
-        govIDField.setForeground(UIManager.getColor("Viewer.fieldForeground"));
-        fieldsPanel.add(govIDField);
-        fieldsPanel.add(Box.createVerticalStrut(4));
-        studentIDLabel = new JLabel("Student ID");
-        studentIDLabel.setAlignmentX(JLabel.LEFT_ALIGNMENT);
-        studentIDLabel.setMaximumSize(labelDim);
+        fieldsPanel.add(govIDLabel, gbc);
+        gbc.gridy++;
+        fieldsPanel.add(govIDField, gbc);
+        gbc.gridy++;
         studentIDLabel.setForeground(UIManager.getColor("Viewer.foreground"));
-        fieldsPanel.add(studentIDLabel);
-        studentIDField = new JTextField();
-        studentIDField.setMaximumSize(fieldDim);
-        studentIDField.setAlignmentX(JTextField.LEFT_ALIGNMENT);
-        studentIDField.setBackground(UIManager.getColor("Viewer.fieldBackground"));
-        studentIDField.setForeground(UIManager.getColor("Viewer.fieldForeground"));
-        fieldsPanel.add(studentIDField);
-        fieldsPanel.add(Box.createVerticalStrut(8));
-        panel.add(fieldsPanel, BorderLayout.NORTH);
+        fieldsPanel.add(studentIDLabel, gbc);
+        gbc.gridy++;
+        fieldsPanel.add(studentIDField, gbc);
+        gbc.gridy++;
+        gbc.gridy++;
+        studentIDLabel.setForeground(UIManager.getColor("Viewer.foreground"));
+        fieldsPanel.add(studentIDLabel, gbc);
+        gbc.gridy++;
+        fieldsPanel.add(studentIDField, gbc);
+        gbc.gridy++;
+        // --- Description and tags panel (fills vertical space) ---
+        JPanel metaPanel = new JPanel(new GridBagLayout());
+        metaPanel.setOpaque(false);
+        GridBagConstraints mGbc = new GridBagConstraints();
+        mGbc.gridx = 0;
+        mGbc.gridy = 0;
+        mGbc.weightx = 1.0;
+        mGbc.fill = GridBagConstraints.HORIZONTAL;
+        mGbc.insets = new Insets(0, 0, 2, 0);
+        JLabel descLabel = new JLabel("Desc.");
+        descLabel.setForeground(UIManager.getColor("Viewer.foreground"));
+        metaPanel.add(descLabel, mGbc);
+        mGbc.gridy++;
+        mGbc.weighty = 1.0;
+        mGbc.fill = GridBagConstraints.BOTH;
+        // Description area (fills vertical space)
+        descArea.setAlignmentX(Component.LEFT_ALIGNMENT);
+        descArea.setLineWrap(true);
+        descArea.setWrapStyleWord(true);
+        descArea.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
+        descScroll = new JScrollPane(descArea);
+        descScroll.setAlignmentX(Component.LEFT_ALIGNMENT);
+        descScroll.setBorder(BorderFactory.createEmptyBorder(0,0,0,0));
+        descScroll.setBackground(UIManager.getColor("Viewer.fieldBackground"));
+        descScroll.setForeground(UIManager.getColor("Viewer.fieldForeground"));
+        descScroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+        descScroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
+        metaPanel.add(descScroll, mGbc);
+        mGbc.gridy++;
+        mGbc.weighty = 0;
+        mGbc.fill = GridBagConstraints.HORIZONTAL;
+        JLabel tagsLabel = new JLabel("Tags");
+        tagsLabel.setForeground(UIManager.getColor("Viewer.foreground"));
+        metaPanel.add(tagsLabel, mGbc);
+        mGbc.gridy++;
+        // Tags field (single line)
+        tagsField.setAlignmentX(Component.LEFT_ALIGNMENT);
+        tagsField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 22));
+        tagsField.setMinimumSize(new Dimension(0, 22));
+        tagsField.setBackground(UIManager.getColor("Viewer.fieldBackground"));
+        tagsField.setForeground(UIManager.getColor("Viewer.fieldForeground"));
+        tagsField.setBorder(UIManager.getBorder("TextField.border"));
+        metaPanel.add(tagsField, mGbc);
+        metaPanel.add(Box.createVerticalStrut(8));
+
+        // --- Add fieldsPanel and metaPanel to a wrapper with vertical stretch ---
+        JPanel centerPanel = new JPanel(new GridBagLayout());
+        centerPanel.setOpaque(false);
+        GridBagConstraints cGbc = new GridBagConstraints();
+        cGbc.gridx = 0;
+        cGbc.gridy = 0;
+        cGbc.weightx = 1.0;
+        cGbc.weighty = 0;
+        cGbc.fill = GridBagConstraints.HORIZONTAL;
+        centerPanel.add(fieldsPanel, cGbc);
+        cGbc.gridy++;
+        cGbc.weighty = 1.0;
+        cGbc.fill = GridBagConstraints.BOTH;
+        centerPanel.add(metaPanel, cGbc);
+        panel.add(centerPanel, BorderLayout.CENTER);
+
         JPanel buttonPanel = new JPanel();
         buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
         buttonPanel.setBackground(UIManager.getColor("Viewer.background"));
-        addButton = new JButton("Add");
-        updateButton = new JButton("Update");
-        deleteButton = new JButton("Delete");
-        Dimension btnDim = new Dimension(120, fieldHeight);
+        // Use FlatButton for animated, original-style buttons
+        addButton = new FlatButton("Add");
+        updateButton = new FlatButton("Update");
+        deleteButton = new FlatButton("Delete");
+        addButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        updateButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        deleteButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        Dimension btnDim = new Dimension(Integer.MAX_VALUE, 22);
         addButton.setMaximumSize(btnDim);
         updateButton.setMaximumSize(btnDim);
         deleteButton.setMaximumSize(btnDim);
-        addButton.setAlignmentX(JButton.LEFT_ALIGNMENT);
-        updateButton.setAlignmentX(JButton.LEFT_ALIGNMENT);
-        deleteButton.setAlignmentX(JButton.LEFT_ALIGNMENT);
-        addButton.setBackground(UIManager.getColor("Viewer.background"));
-        updateButton.setBackground(UIManager.getColor("Viewer.background"));
-        deleteButton.setBackground(UIManager.getColor("Viewer.background"));
-        addButton.setForeground(UIManager.getColor("Viewer.foreground"));
-        updateButton.setForeground(UIManager.getColor("Viewer.foreground"));
-        deleteButton.setForeground(UIManager.getColor("Viewer.foreground"));
         buttonPanel.add(addButton);
         buttonPanel.add(Box.createVerticalStrut(4));
         buttonPanel.add(updateButton);
@@ -176,24 +234,128 @@ public class PersonViewerImpl implements PViewer {
         setCreationMode(true);
         // After all fields are initialized:
         applyThemeToTextFields();
+        installFieldFocusListeners();
         updateFieldStates();
         highlightEditFields(!creationMode && currentPerson != null);
+        // Remove all setPreferredSize, setMaximumSize, and setMinimumSize calls for all fields, labels, and scrolls
+        // Only use GridBagLayout with weightx=1.0 and fill=HORIZONTAL for every field and label
+        // This ensures fields always match the module width and never overflow or get covered
     }
 
     // Helper to re-apply theme colors to all text fields
     private void applyThemeToTextFields() {
+        // Always fetch the latest color from UIManager for every border
         Color bg = UIManager.getColor("Viewer.fieldBackground");
         Color fg = UIManager.getColor("Viewer.fieldForeground");
-        firstNameField.setBackground(bg);
-        firstNameField.setForeground(fg);
-        lastNameField.setBackground(bg);
-        lastNameField.setForeground(fg);
-        dobField.setBackground(bg);
-        dobField.setForeground(fg);
-        govIDField.setBackground(bg);
-        govIDField.setForeground(fg);
-        studentIDField.setBackground(bg);
-        studentIDField.setForeground(fg);
+        JTextField[] fields = {firstNameField, lastNameField, dobField, govIDField, studentIDField, tagsField};
+        for (JTextField field : fields) {
+            field.setBackground(bg);
+            field.setForeground(fg);
+            field.setBorder(new AnimatedAccentBorder(field, 12, 1.5f));
+        }
+        if (descScroll != null) {
+            descArea.setBackground(bg);
+            descArea.setForeground(fg);
+            descScroll.setBorder(new AnimatedAccentBorder(descScroll, 12, 1.5f));
+        }
+    }
+
+    private static Color getLiveAccent() {
+        Color accent = UIManager.getColor("ACCENT");
+        if (accent == null) accent = Color.BLUE; // fallback to blue if theme is missing ACCENT
+        return accent;
+    }
+
+    private static class AnimatedAccentBorder extends javax.swing.border.AbstractBorder {
+        private int arc;
+        private float thickness;
+        private float animPhase = 0f;
+        private boolean focused = false;
+        private javax.swing.Timer timer;
+        private final JComponent owner;
+        public AnimatedAccentBorder(JComponent owner, int arc, float thickness) {
+            this.owner = owner;
+            this.arc = arc;
+            this.thickness = thickness;
+        }
+        @Override
+        public void paintBorder(Component c, Graphics g, int x, int y, int width, int height) {
+            Color accent = getLiveAccent();
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            float anim = (float) (0.5 + 0.5 * Math.sin(animPhase));
+            Color borderColor = focused ? accent.brighter() : accent.darker();
+            if (focused) {
+                borderColor = blend(accent, Color.WHITE, 0.18f + 0.12f * anim);
+            }
+            g2.setStroke(new BasicStroke(thickness + (focused ? 0.7f * anim : 0f)));
+            g2.setColor(borderColor);
+            g2.drawRoundRect(x + 1, y + 1, width - 3, height - 3, arc, arc);
+            g2.dispose();
+        }
+        @Override
+        public Insets getBorderInsets(Component c) {
+            return new Insets(6, 8, 6, 8);
+        }
+        @Override
+        public Insets getBorderInsets(Component c, Insets insets) {
+            insets.set(6, 8, 6, 8);
+            return insets;
+        }
+        private static Color blend(Color c1, Color c2, float ratio) {
+            float ir = 1.0f - ratio;
+            int r = (int) (c1.getRed() * ir + c2.getRed() * ratio);
+            int g = (int) (c1.getGreen() * ir + c2.getGreen() * ratio);
+            int b = (int) (c1.getBlue() * ir + c2.getBlue() * ratio);
+            return new Color(r, g, b, 255);
+        }
+        private void startAnimation() {
+            if (timer == null) {
+                timer = new javax.swing.Timer(30, _ -> {
+                    animPhase += 0.09f;
+                    owner.repaint();
+                });
+            }
+            if (!timer.isRunning()) timer.start();
+        }
+        private void stopAnimation() {
+            if (timer != null && timer.isRunning()) timer.stop();
+        }
+        public void setFocused(boolean focused) {
+            if (this.focused != focused) {
+                this.focused = focused;
+                if (focused) startAnimation(); else stopAnimation();
+                owner.repaint();
+            }
+        }
+    }
+
+    private void installFieldFocusListeners() {
+        JTextField[] fields = {firstNameField, lastNameField, dobField, govIDField, studentIDField, tagsField};
+        for (JTextField field : fields) {
+            field.addFocusListener(new java.awt.event.FocusAdapter() {
+                @Override
+                public void focusGained(java.awt.event.FocusEvent e) {
+                    if (field.getBorder() instanceof AnimatedAccentBorder b) b.setFocused(true);
+                }
+                @Override
+                public void focusLost(java.awt.event.FocusEvent e) {
+                    if (field.getBorder() instanceof AnimatedAccentBorder b) b.setFocused(false);
+                }
+            });
+        }
+        if (descScroll != null) {
+            descArea.addFocusListener(new java.awt.event.FocusAdapter() {
+                @Override
+                public void focusGained(java.awt.event.FocusEvent e) {
+                    if (descScroll.getBorder() instanceof AnimatedAccentBorder b) b.setFocused(true);
+                }
+                @Override
+                public void focusLost(java.awt.event.FocusEvent e) {
+                    if (descScroll.getBorder() instanceof AnimatedAccentBorder b) b.setFocused(false);
+                }
+            });
+        }
     }
 
     @Override
@@ -208,6 +370,17 @@ public class PersonViewerImpl implements PViewer {
         dobField.setText(formattedDate);
         govIDField.setText("");
         studentIDField.setText("");
+        // Load description and tags from People metadata if available
+        descArea.setText("");
+        tagsField.setText("");
+        if (appController != null) {
+            int idx = appController.getPeople().indexOf(person);
+            if (idx >= 0) {
+                var meta = appController.getPeople().getMeta(idx);
+                descArea.setText(meta.getDescription());
+                tagsField.setText(meta.getTags());
+            }
+        }
         if (person instanceof RegisteredPerson) {
             RegisteredPerson regPerson = (RegisteredPerson) person;
             govIDField.setText(regPerson.getGovID());
@@ -229,6 +402,8 @@ public class PersonViewerImpl implements PViewer {
         dobField.setText("");
         govIDField.setText("");
         studentIDField.setText("");
+        descArea.setText("");
+        tagsField.setText("");
         currentPerson = null;
         highlightEditFields(false);
         setCreationMode(true);
@@ -299,8 +474,11 @@ public class PersonViewerImpl implements PViewer {
             String dob = dobField.getText().trim();
             String govID = govIDField.getText().trim();
             String studentID = studentIDField.getText().trim();
-            AppController.AddResult result = appController.addPersonFromFields(firstName, lastName, dob, govID, studentID);
+            String desc = descArea.getText().trim();
+            String tags = tagsField.getText().trim();
+            AppController.AddResult result = appController.addPersonFromFields(firstName, lastName, dob, govID, studentID, desc, tags);
             if (result.success) {
+                // No need to find idx or updateMeta, already handled in addPersonFromFields
                 JOptionPane.showMessageDialog(parent, "Person added successfully");
                 clearFields();
             } else {
@@ -316,7 +494,9 @@ public class PersonViewerImpl implements PViewer {
             String dob = dobField.getText().trim();
             String govID = govIDField.getText().trim();
             String studentID = studentIDField.getText().trim();
-            AppController.AddResult result = appController.updatePersonFromFields(index, firstName, lastName, dob, govID, studentID);
+            String desc = descArea.getText().trim();
+            String tags = tagsField.getText().trim();
+            AppController.AddResult result = appController.updatePersonFromFields(index, firstName, lastName, dob, govID, studentID, desc, tags);
             if (result.success) {
                 JOptionPane.showMessageDialog(parent, "Person updated successfully");
                 clearFields();
@@ -426,9 +606,7 @@ public class PersonViewerImpl implements PViewer {
     private void highlightEditFields(boolean isEditing) {
         Color textFieldBg = UIManager.getColor("Viewer.fieldBackground");
         Color textFieldHighlightBg = UIManager.getColor("Highlight.background");
-        Color textFieldHighlightBorder = UIManager.getColor("Highlight.border");
         Color bgColor = isEditing ? textFieldHighlightBg : textFieldBg;
-        Color borderColor = isEditing ? textFieldHighlightBorder : null;
         firstNameField.setBackground(bgColor);
         lastNameField.setBackground(bgColor);
         dobField.setBackground(bgColor);
@@ -438,18 +616,65 @@ public class PersonViewerImpl implements PViewer {
         if (!studentIDField.getText().trim().isEmpty()) {
             studentIDField.setBackground(bgColor);
         }
-        if (isEditing) {
-            firstNameField.setBorder(BorderFactory.createLineBorder(borderColor));
-            lastNameField.setBorder(BorderFactory.createLineBorder(borderColor));
-            dobField.setBorder(BorderFactory.createLineBorder(borderColor));
-            govIDField.setBorder(BorderFactory.createLineBorder(borderColor));
-            studentIDField.setBorder(BorderFactory.createLineBorder(borderColor));
-        } else {
-            firstNameField.setBorder(UIManager.getBorder("TextField.border"));
-            lastNameField.setBorder(UIManager.getBorder("TextField.border"));
-            dobField.setBorder(UIManager.getBorder("TextField.border"));
-            govIDField.setBorder(UIManager.getBorder("TextField.border"));
-            studentIDField.setBorder(UIManager.getBorder("TextField.border"));
+        // Do not touch borders here!
+    }
+
+    /**
+     * Call this after a theme change to ensure all field borders and colors update to the new theme.
+     */
+    public void refreshFieldBordersForTheme() {
+        applyThemeToTextFields();
+        // Force repaint for all fields and scroll
+        JTextField[] fields = {firstNameField, lastNameField, dobField, govIDField, studentIDField, tagsField};
+        for (JTextField field : fields) field.repaint();
+        if (descScroll != null) descScroll.repaint();
+        if (descArea != null) descArea.repaint();
+    }
+
+    /**
+     * Ensures all fields and borders update with the current theme. Call after theme changes.
+     */
+    public void updateUI() {
+        // Recreate borders with the latest theme color
+        applyThemeToTextFields();
+        // Force repaint for all fields and scroll
+        JTextField[] fields = {firstNameField, lastNameField, dobField, govIDField, studentIDField, tagsField};
+        for (JTextField field : fields) {
+            field.setBorder(new AnimatedAccentBorder(field, 12, 1.5f));
+            field.updateUI();
+        }
+        if (descScroll != null) {
+            descScroll.setBorder(new AnimatedAccentBorder(descScroll, 12, 1.5f));
+            descScroll.updateUI();
+        }
+        if (descArea != null) descArea.updateUI();
+        if (panel != null) panel.updateUI();
+        // No need to update button theme colors, handled by global UI
+    }
+
+    public class PersonViewerPanel extends JPanel implements Scrollable {
+        public PersonViewerPanel(LayoutManager layout) {
+            super(layout);
+        }
+        @Override
+        public Dimension getPreferredScrollableViewportSize() {
+            return getParent() != null ? getParent().getSize() : getPreferredSize();
+        }
+        @Override
+        public int getScrollableUnitIncrement(Rectangle visibleRect, int orientation, int direction) {
+            return 16;
+        }
+        @Override
+        public int getScrollableBlockIncrement(Rectangle visibleRect, int orientation, int direction) {
+            return Math.max(visibleRect.width, visibleRect.height) - 16;
+        }
+        @Override
+        public boolean getScrollableTracksViewportWidth() {
+            return true;
+        }
+        @Override
+        public boolean getScrollableTracksViewportHeight() {
+            return true;
         }
     }
 }

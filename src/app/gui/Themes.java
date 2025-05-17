@@ -1,7 +1,9 @@
 package src.app.gui;
 
 import java.awt.*;
+import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.Properties;
 import javax.swing.UIManager;
 import javax.swing.SwingUtilities;
@@ -123,6 +125,7 @@ public class Themes {
         UIManager.put("Menu.selectionForeground", getColor(props, "MENU_SEL_FG", getColor(props, "FG", Color.LIGHT_GRAY)));
         UIManager.put("PopupMenu.selectionBackground", getColor(props, "POPUPMENU_SEL_BG", getColor(props, "MENU_SEL_BG", getColor(props, "ACCENT", Color.BLUE))));
         UIManager.put("PopupMenu.selectionForeground", getColor(props, "POPUPMENU_SEL_FG", getColor(props, "MENU_SEL_FG", getColor(props, "FG", Color.WHITE))));
+        UIManager.put("MENU_BG", getColor(props, "MENU_BG", getColor(props, "MAINBAR_BG", getColor(props, "BG", Color.DARK_GRAY))));
         // Explicitly set for Nimbus compatibility
         UIManager.put("MenuItem[Selected].textForeground", getColor(props, "POPUPMENU_SEL_FG", getColor(props, "MENU_SEL_FG", getColor(props, "FG", Color.WHITE))));
         UIManager.put("Menu[Selected].textForeground", getColor(props, "POPUPMENU_SEL_FG", getColor(props, "MENU_SEL_FG", getColor(props, "FG", Color.WHITE))));
@@ -152,6 +155,9 @@ public class Themes {
         UIManager.put("Viewer.foreground", getColor(props, "VIEWER_FG", getColor(props, "FG", Color.LIGHT_GRAY)));
         UIManager.put("Viewer.fieldBackground", getColor(props, "VIEWER_FIELD_BG", getColor(props, "TEXTFIELD_BG", Color.DARK_GRAY)));
         UIManager.put("Viewer.fieldForeground", getColor(props, "VIEWER_FIELD_FG", getColor(props, "TEXTFIELD_FG", Color.LIGHT_GRAY)));
+        // Set custom ButtonUI for Viewer and Filter modules only
+        UIManager.put("Viewer.buttonUI", "src.app.gui.FlatButtonUI");
+        UIManager.put("Filter.buttonUI", "src.app.gui.FlatButtonUI");
         // Status/semantic colors
         UIManager.put("Error.foreground", getColor(props, "ERROR", Color.RED));
         UIManager.put("Success.foreground", getColor(props, "SUCCESS", Color.GREEN));
@@ -161,6 +167,7 @@ public class Themes {
         UIManager.put("Primary", getColor(props, "PRIMARY", getColor(props, "ACCENT", Color.BLUE)));
         UIManager.put("Secondary", getColor(props, "SECONDARY", getColor(props, "BUTTON_BG", Color.DARK_GRAY)));
         UIManager.put("Surface", getColor(props, "SURFACE", getColor(props, "BG", Color.DARK_GRAY)));
+        UIManager.put("ACCENT", getColor(props, "ACCENT", Color.BLUE));
     }
 
     /**
@@ -208,10 +215,37 @@ public class Themes {
     }
 
     /**
+     * Load and set Inter as the default font for the entire app.
+     * Call this before applying theme properties.
+     */
+    public static void setGlobalAppFont() {
+        try {
+            // Load font from vendored location
+            File fontFile = new File("data/.assets/Inter-Regular.ttf");
+            if (fontFile.exists()) {
+                Font inter = Font.createFont(Font.TRUETYPE_FONT, fontFile).deriveFont(Font.PLAIN, 13f); // Use 13f for compact UI
+                // Register font with the graphics environment
+                GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+                ge.registerFont(inter);
+                // Set as default for all UI
+                UIManager.put("defaultFont", inter);
+                // For Nimbus and other L&Fs, set for all major component types
+                String[] keys = {"Button.font", "ToggleButton.font", "RadioButton.font", "CheckBox.font", "ColorChooser.font", "ComboBox.font", "Label.font", "List.font", "MenuBar.font", "MenuItem.font", "RadioButtonMenuItem.font", "CheckBoxMenuItem.font", "Menu.font", "PopupMenu.font", "OptionPane.font", "Panel.font", "ProgressBar.font", "ScrollPane.font", "Viewport.font", "TabbedPane.font", "Table.font", "TableHeader.font", "TextField.font", "PasswordField.font", "TextArea.font", "TextPane.font", "EditorPane.font", "TitledBorder.font", "ToolBar.font", "ToolTip.font", "Tree.font"};
+                for (String key : keys) {
+                    UIManager.put(key, inter);
+                }
+            }
+        } catch (FontFormatException | IOException e) {
+            System.err.println("Failed to load Inter font: " + e.getMessage());
+        }
+    }
+
+    /**
      * Apply the theme and refresh all open windows/dialogs in one step.
      * This is the only method you need to call for live theme switching.
      */
     public static void applyThemeAndRefreshAllWindows(Properties themeProps) {
+        setGlobalAppFont(); // Ensure font is set before theme
         try {
             for (UIManager.LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
                 if ("Nimbus".equals(info.getName())) {

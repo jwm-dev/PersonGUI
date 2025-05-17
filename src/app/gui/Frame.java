@@ -48,6 +48,7 @@ public class Frame extends JFrame {
         menuBar.setMinimumSize(new Dimension(1, barHeight));
         // --- File Menu ---
         JMenu fileMenu = new FlatMenu("File");
+        fileMenu.setFont(fileMenu.getFont().deriveFont(Font.PLAIN, 15f));
         JMenuItem newItem = new FlatMenuItem("New");
         JMenuItem openItem = new FlatMenuItem("Open...");
         JMenuItem saveItem = new FlatMenuItem("Save");
@@ -73,28 +74,32 @@ public class Frame extends JFrame {
         fileMenu.add(exitItem);
         // --- Tools Menu ---
         JMenu settingsMenu = new FlatMenu("Tools");
+        settingsMenu.setFont(settingsMenu.getFont().deriveFont(Font.PLAIN, 15f));
         JMenuItem resetDefaultsItem = new FlatMenuItem("Reset to Default Settings");
-        JMenuItem editConfigItem = new FlatMenuItem("Edit Config...");
         resetDefaultsItem.addActionListener(_ -> resetToDefaults());
-        editConfigItem.addActionListener(_ -> new src.app.dialogs.ConfigEditorDialog(this, this, "data/.config/config", appController).setVisible(true));
         settingsMenu.add(resetDefaultsItem);
+        JMenuItem editConfigItem = new FlatMenuItem("Change Theme...");
+        editConfigItem.addActionListener(_ -> new src.app.dialogs.ThemeChange(this, this, "data/.config/config", appController).setVisible(true));
         settingsMenu.add(editConfigItem);
+        // Add Wikipedia Import
+        JMenuItem wikiImportItem = new FlatMenuItem("Import from Wikipedia...");
+        wikiImportItem.addActionListener(_ -> src.app.dialogs.WikipediaImportDialog.showDialog(this, appController));
+        settingsMenu.add(wikiImportItem);
         // --- Help Menu ---
         JMenu helpMenu = new FlatMenu("Help");
+        helpMenu.setFont(helpMenu.getFont().deriveFont(Font.PLAIN, 15f));
         JMenuItem aboutItem = new FlatMenuItem("About");
         aboutItem.addActionListener(_ -> JOptionPane.showMessageDialog(this, "Person Management System\nCreated for OCCC Java Course", "About", JOptionPane.INFORMATION_MESSAGE));
         helpMenu.add(aboutItem);
         // --- Add Menus to Bar with extra spacing ---
-        menuBar.add(Box.createHorizontalStrut(12));
         menuBar.add(fileMenu);
-        menuBar.add(Box.createHorizontalStrut(18));
+        menuBar.add(Box.createHorizontalStrut(9));
         menuBar.add(settingsMenu);
-        menuBar.add(Box.createHorizontalStrut(18));
+        menuBar.add(Box.createHorizontalStrut(9));
         menuBar.add(helpMenu);
-        menuBar.add(Box.createHorizontalGlue());
+        menuBar.add(Box.createHorizontalGlue()); // Only one glue before controlsPanel
         // --- Window Controls (Linux-friendly) ---
         JPanel controlsPanel = createSimpleWindowControlsPanel(barHeight);
-        menuBar.add(Box.createHorizontalGlue()); // Push controls to the right
         menuBar.add(controlsPanel);
         return menuBar;
     }
@@ -125,9 +130,10 @@ public class Frame extends JFrame {
         JPanel controlsPanel = new JPanel();
         controlsPanel.setLayout(new BoxLayout(controlsPanel, BoxLayout.X_AXIS));
         controlsPanel.setOpaque(false);
-        controlsPanel.setPreferredSize(new Dimension(90, barHeight));
-        controlsPanel.setMaximumSize(new Dimension(90, barHeight));
-        controlsPanel.setMinimumSize(new Dimension(90, barHeight));
+        // Remove fixed width constraints so panel can hug the right edge
+        // controlsPanel.setPreferredSize(new Dimension(90, barHeight));
+        // controlsPanel.setMaximumSize(new Dimension(90, barHeight));
+        // controlsPanel.setMinimumSize(new Dimension(90, barHeight));
         WindowControlButton minimizeButton = new WindowControlButton(WindowControlButton.Type.MINIMIZE, barHeight);
         WindowControlButton maximizeButton = new WindowControlButton(WindowControlButton.Type.MAXIMIZE, barHeight);
         WindowControlButton closeButton = new WindowControlButton(WindowControlButton.Type.CLOSE, barHeight);
@@ -137,11 +143,12 @@ public class Frame extends JFrame {
         minimizeButton.addActionListener(_ -> setState(Frame.ICONIFIED));
         maximizeButton.addActionListener(_ -> setState(getState() == Frame.MAXIMIZED_BOTH ? Frame.NORMAL : Frame.MAXIMIZED_BOTH));
         closeButton.addActionListener(_ -> dispatchEvent(new java.awt.event.WindowEvent(this, java.awt.event.WindowEvent.WINDOW_CLOSING)));
+        // Reduce struts to minimum for edge alignment
         controlsPanel.add(Box.createHorizontalStrut(6));
         controlsPanel.add(minimizeButton);
-        controlsPanel.add(Box.createHorizontalStrut(8));
+        controlsPanel.add(Box.createHorizontalStrut(10));
         controlsPanel.add(maximizeButton);
-        controlsPanel.add(Box.createHorizontalStrut(8));
+        controlsPanel.add(Box.createHorizontalStrut(10));
         controlsPanel.add(closeButton);
         controlsPanel.add(Box.createHorizontalStrut(6));
         return controlsPanel;
@@ -523,6 +530,9 @@ public class Frame extends JFrame {
     // Helper to install a custom divider UI that paints a thin accent line in the center
     private void installThinDividerUI(JSplitPane splitPane) {
         AppController controller = this.appController;
+        Color dividerBg = controller.getThemeColor("SPLITPANE_DIVIDER_BG", UIManager.getColor("Panel.background"));
+        splitPane.setBorder(BorderFactory.createEmptyBorder());
+        splitPane.setBackground(dividerBg);
         splitPane.setUI(new BasicSplitPaneUI() {
             @Override
             public BasicSplitPaneDivider createDefaultDivider() {
@@ -531,8 +541,11 @@ public class Frame extends JFrame {
                     public void paint(Graphics g) {
                         int w = getWidth();
                         int h = getHeight();
-                        // Always fetch the accent color from AppController for live theme support
                         Color accent = controller.getThemeColor("ACCENT", Color.BLUE);
+                        // Fill divider background with theme color
+                        g.setColor(dividerBg);
+                        g.fillRect(0, 0, w, h);
+                        // Draw accent line
                         g.setColor(accent);
                         if (splitPane.getOrientation() == JSplitPane.HORIZONTAL_SPLIT) {
                             int x = w / 2;
@@ -640,7 +653,6 @@ public class Frame extends JFrame {
         public enum Type { MINIMIZE, MAXIMIZE, CLOSE }
         private final Type type;
         private boolean hovered = false;
-        private boolean pressed = false;
         private final int barHeight;
         public WindowControlButton(Type type, int barHeight) {
             super("");
@@ -650,16 +662,14 @@ public class Frame extends JFrame {
             setBorderPainted(false);
             setFocusPainted(false);
             setContentAreaFilled(false);
-            int btnSize = barHeight - 12;
+            int btnSize = barHeight - 8; // slightly larger for macOS look
             setPreferredSize(new Dimension(btnSize, btnSize));
             setMaximumSize(new Dimension(btnSize, btnSize));
             setMinimumSize(new Dimension(btnSize, btnSize));
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             addMouseListener(new java.awt.event.MouseAdapter() {
                 @Override public void mouseEntered(java.awt.event.MouseEvent e) { hovered = true; repaint(); }
-                @Override public void mouseExited(java.awt.event.MouseEvent e) { hovered = false; pressed = false; repaint(); }
-                @Override public void mousePressed(java.awt.event.MouseEvent e) { pressed = true; repaint(); }
-                @Override public void mouseReleased(java.awt.event.MouseEvent e) { pressed = false; repaint(); }
+                @Override public void mouseExited(java.awt.event.MouseEvent e) { hovered = false; repaint(); }
             });
         }
         @Override
@@ -672,34 +682,37 @@ public class Frame extends JFrame {
         protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            Color fg = UIManager.getColor("MAINBAR_FG");
-            Color closeFg = UIManager.getColor("CLOSE_BUTTON_FG");
-            Color mainbarBg = UIManager.getColor("MAINBAR_BG");
-            if (fg == null) fg = Color.DARK_GRAY;
-            if (closeFg == null) closeFg = Color.RED;
-            if (mainbarBg == null) mainbarBg = Color.LIGHT_GRAY;
-            // Only paint a subtle hover/pressed effect
-            if (pressed) {
-                g2.setColor(new Color(0,0,0,36));
-                g2.fillOval(2, 2, getWidth()-4, getHeight()-4);
-            } else if (hovered) {
-                g2.setColor(new Color(0,0,0,18));
-                g2.fillOval(2, 2, getWidth()-4, getHeight()-4);
-            }
-            // Icon
             int w = getWidth(), h = getHeight();
-            g2.setStroke(new BasicStroke(Math.max(1.1f, barHeight/24f), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            Color iconColor = (type == Type.CLOSE) ? closeFg : fg;
-            g2.setColor(iconColor);
-            int cx = w / 2, cy = h / 2;
-            int iconSize = Math.max(5, barHeight/4);
-            if (type == Type.MINIMIZE) {
-                g2.drawLine(cx - iconSize, cy + iconSize/2, cx + iconSize, cy + iconSize/2);
-            } else if (type == Type.MAXIMIZE) {
-                g2.drawRoundRect(cx - iconSize, cy - iconSize, iconSize*2, iconSize*2, 3, 3);
-            } else if (type == Type.CLOSE) {
-                g2.drawLine(cx - iconSize, cy - iconSize, cx + iconSize, cy + iconSize);
-                g2.drawLine(cx + iconSize, cy - iconSize, cx - iconSize, cy + iconSize);
+            int d = Math.min(w, h) - 2;
+            int x = (w - d) / 2, y = (h - d) / 2;
+            Color circleColor;
+            switch (type) {
+                case CLOSE: circleColor = new Color(0xED6A5E); break; // matte red
+                case MINIMIZE: circleColor = new Color(0xF5C242); break; // matte yellow
+                case MAXIMIZE: circleColor = new Color(0x61C554); break; // matte green
+                default: circleColor = Color.GRAY;
+            }
+            g2.setColor(circleColor);
+            g2.fillOval(x, y, d, d);
+            // Draw border for matte look
+            g2.setColor(new Color(0,0,0,30));
+            g2.drawOval(x, y, d, d);
+            // Draw icon on hover only
+            if (hovered) {
+                g2.setStroke(new BasicStroke(Math.max(1.1f, d/12f), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                Color iconColor = new Color(90, 90, 90, 200); // lighter semi-transparent gray
+                g2.setColor(iconColor);
+                int cx = w / 2, cy = h / 2;
+                int iconSize = d / 6; // even smaller icon
+                if (type == Type.MINIMIZE) {
+                    g2.drawLine(cx - iconSize, cy, cx + iconSize, cy);
+                } else if (type == Type.MAXIMIZE) {
+                    int r = iconSize;
+                    g2.drawRect(cx - r, cy - r, r * 2, r * 2);
+                } else if (type == Type.CLOSE) {
+                    g2.drawLine(cx - iconSize, cy - iconSize, cx + iconSize, cy + iconSize);
+                    g2.drawLine(cx + iconSize, cy - iconSize, cx - iconSize, cy + iconSize);
+                }
             }
             g2.dispose();
         }

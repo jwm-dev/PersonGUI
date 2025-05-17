@@ -402,13 +402,15 @@ public class PersonTerminalImpl extends JPanel implements PTerminal {
     }
     private void handleAdd(List<String> args) {
         if (args.size() < 3) {
-            appendOutput("Usage: add <FirstName> <LastName> <DOB MM/DD/YYYY> [GovID] [StudentID]");
+            appendOutput("Usage: add <FirstName> <LastName> <DOB MM/DD/YYYY> [GovID] [StudentID] [Description] [Tags]");
             return;
         }
         String first = args.get(0), last = args.get(1), dob = args.get(2);
         String gov = args.size() > 3 ? args.get(3) : "";
         String stu = args.size() > 4 ? args.get(4) : "";
-        var result = manager.addPersonFromFields(first, last, dob, gov, stu);
+        String desc = args.size() > 5 ? args.get(5) : "";
+        String tags = args.size() > 6 ? args.get(6) : "";
+        var result = manager.addPersonFromFields(first, last, dob, gov, stu, desc, tags);
         if (result.success) {
             appendOutput("Person added.");
         } else {
@@ -417,7 +419,7 @@ public class PersonTerminalImpl extends JPanel implements PTerminal {
     }
     private void handleEdit(List<String> args) {
         if (args.size() < 4) {
-            appendOutput("Usage: edit <index> <FirstName> <LastName> <DOB MM/DD/YYYY> [GovID] [StudentID]");
+            appendOutput("Usage: edit <index> <FirstName> <LastName> <DOB MM/DD/YYYY> [GovID] [StudentID] [Description] [Tags]");
             return;
         }
         try {
@@ -425,7 +427,9 @@ public class PersonTerminalImpl extends JPanel implements PTerminal {
             String first = args.get(1), last = args.get(2), dob = args.get(3);
             String gov = args.size() > 4 ? args.get(4) : "";
             String stu = args.size() > 5 ? args.get(5) : "";
-            var result = manager.updatePersonFromFields(idx, first, last, dob, gov, stu);
+            String desc = args.size() > 6 ? args.get(6) : "";
+            String tags = args.size() > 7 ? args.get(7) : "";
+            var result = manager.updatePersonFromFields(idx, first, last, dob, gov, stu, desc, tags);
             if (result.success) {
                 appendOutput("Person updated.");
             } else {

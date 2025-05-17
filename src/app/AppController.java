@@ -165,18 +165,23 @@ public class AppController {
         public final boolean success; public final String errorMessage;
         public AddResult(boolean s, String e) { success = s; errorMessage = e; }
     }
-    public AddResult addPersonFromFields(String first, String last, String dobStr, String govID, String studentID) {
+    public AddResult addPersonFromFields(String first, String last, String dobStr, String govID, String studentID, String description, String tags) {
         String err = validatePersonFields(first, last, dobStr, govID, studentID, -1);
         if (err != null) return new AddResult(false, err);
         Person p = buildPerson(first, last, dobStr, govID, studentID);
-        if (people.add(p)) { modified = hasChanges = true; notifyDataChanged(); return new AddResult(true, null); }
+        if (people.add(p, description, tags)) { modified = hasChanges = true; notifyDataChanged(); return new AddResult(true, null); }
         return new AddResult(false, "Failed to add person (unknown error).");
     }
-    public AddResult updatePersonFromFields(int idx, String first, String last, String dobStr, String govID, String studentID) {
+    public AddResult updatePersonFromFields(int idx, String first, String last, String dobStr, String govID, String studentID, String description, String tags) {
         String err = validatePersonFields(first, last, dobStr, govID, studentID, idx);
         if (err != null) return new AddResult(false, err);
         Person p = buildPerson(first, last, dobStr, govID, studentID);
-        if (people.update(idx, p)) { modified = hasChanges = true; notifyDataChanged(); return new AddResult(true, null); }
+        if (people.update(idx, p)) {
+            people.updateMeta(idx, description, tags);
+            modified = hasChanges = true;
+            notifyDataChanged();
+            return new AddResult(true, null);
+        }
         return new AddResult(false, "Failed to update person (unknown error).");
     }
     public boolean deletePersonByIndex(int idx) {
