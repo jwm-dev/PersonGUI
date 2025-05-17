@@ -273,19 +273,80 @@ public class WikipediaImportDialog extends JDialog {
         }
     }
 
-    // Extract both name and link for each person
+    // Improved HTML parsing using a state machine (no regex for nested tags)
     private List<PersonEntry> extractNamesAndLinksFromWikipediaList(String html) {
         List<PersonEntry> entries = new ArrayList<>();
-        // Only match <li> that starts with <a href="/wiki/ARTICLE">Name</a>
-        Pattern pattern = Pattern.compile("<li>\\s*<a href=\"(/wiki/[^\":#?]+)\"[^>]*>([^<]+)</a>(?:\\s*[–-].*)?</li>", Pattern.CASE_INSENSITIVE);
-        Matcher matcher = pattern.matcher(html);
-        while (matcher.find()) {
-            String link = matcher.group(1).trim();
-            String name = matcher.group(2).trim();
-            // Exclude links with ':' (categories, templates, etc) and empty names
-            if (!name.isEmpty() && !link.contains(":") && !name.contains("[")) {
-                entries.add(new PersonEntry(name, link));
+        Set<String> seenNames = new HashSet<>();
+        int idx = 0;
+        while ((idx = html.indexOf("<li", idx)) != -1) {
+            int liStart = html.indexOf('>', idx);
+            if (liStart == -1) break;
+            int liEnd = html.indexOf("</li>", liStart);
+            if (liEnd == -1) break;
+            String liContent = html.substring(liStart + 1, liEnd).trim();
+            // Only consider <li> that starts with <a href=...>
+            if (!liContent.startsWith("<a")) {
+                idx = liEnd + 5;
+                continue;
             }
+            // Find the first <a href="/wiki/...">Name</a>
+            int aStart = liContent.indexOf("<a ");
+            int hrefStart = liContent.indexOf("href=\"/wiki/", aStart);
+            if (aStart == -1 || hrefStart == -1) {
+                idx = liEnd + 5;
+                continue;
+            }
+            hrefStart += 6; // move past 'href="'
+            int hrefEnd = liContent.indexOf('"', hrefStart + 6);
+            if (hrefEnd == -1) {
+                idx = liEnd + 5;
+                continue;
+            }
+            String link = liContent.substring(hrefStart, hrefEnd);
+            // Only allow links to articles (no ':', '#', '?')
+            if (link.contains(":") || link.contains("#") || link.contains("?")) {
+                idx = liEnd + 5;
+                continue;
+            }
+            int nameStart = liContent.indexOf('>', hrefEnd) + 1;
+            int nameEnd = liContent.indexOf("</a>", nameStart);
+            if (nameStart == 0 || nameEnd == -1) {
+                idx = liEnd + 5;
+                continue;
+            }
+            String name = liContent.substring(nameStart, nameEnd).trim();
+            // Heuristics: at least two capitalized words, no digits, not all caps, not a known non-person
+            String[] parts = name.split(" ");
+            if (parts.length < 2) {
+                idx = liEnd + 5;
+                continue;
+            }
+            boolean allCapitalized = true;
+            for (String part : parts) {
+                if (part.isEmpty() || !Character.isUpperCase(part.charAt(0))) {
+                    allCapitalized = false;
+                    break;
+                }
+            }
+            if (!allCapitalized || name.matches(".*\\d.*") || name.equals(name.toUpperCase())) {
+                idx = liEnd + 5;
+                continue;
+            }
+            if (name.matches(".*(Award|Bibliography|Fiction|Science|Anthology|Series|Magazine|Journal|Press|Publisher|Encyclopedia|Reference|External|Notes|Further|Reading|Sources|See|Also|Category|Portal|Template|Commons|Wikidata|Wikipedia|Help|Special|File|Talk|Draft|Module|Book|Topic|Glossary|Timeline|Navigation|Authority|Control|Index|Outline|Main).*")) {
+                idx = liEnd + 5;
+                continue;
+            }
+            if (link.endsWith("_(disambiguation)")) {
+                idx = liEnd + 5;
+                continue;
+            }
+            if (seenNames.contains(name)) {
+                idx = liEnd + 5;
+                continue;
+            }
+            seenNames.add(name);
+            entries.add(new PersonEntry(name, link));
+            idx = liEnd + 5;
         }
         return entries;
     }
@@ -357,28 +418,30 @@ public class WikipediaImportDialog extends JDialog {
         appendDebug(null, msg);
     }
 
+    // Improved: robustly extract all P569 (birth date) 'time' fields after locating 'P569' in Wikidata JSON
     private PersonWithMeta fetchPersonWithMetaFromWikidata(String relativeLink, String first, String last, java.util.function.Consumer<String> logger) {
         String entityId = getWikidataEntityIdFromWikipedia(relativeLink);
         String description = "";
-        StringBuilder tags = new StringBuilder();
+        StringBuilder occcTags = new StringBuilder();
         OCCCDate dob = new OCCCDate(1, 1, 1);
+        String intro = "";
+        String pageTitle = relativeLink.replace("/wiki/", "");
         if (entityId == null) {
             logger.accept("No Wikidata entity found");
         } else {
             try {
+                // Fetch Wikidata entity info
                 String props = "claims%7Cdescriptions%7Clabels";
                 String apiUrl = "https://www.wikidata.org/w/api.php?action=wbgetentities&ids=" + entityId + "&props=" + props + "&languages=en&format=json";
                 String json = fetchHtml(apiUrl);
-                // Find the entity root
                 String entityKey = "\"" + entityId + "\"";
                 int entityIdx = json.indexOf(entityKey);
-                if (entityIdx == -1) entityIdx = 0; // fallback to start
-                // --- Description ---
+                if (entityIdx == -1) entityIdx = 0;
+                // --- Description (from Wikidata) ---
                 int descRoot = json.indexOf("\"descriptions\"", entityIdx);
                 if (descRoot != -1) {
                     int enIdx = json.indexOf("\"en\"", descRoot);
-                    int nextLangIdx = json.indexOf("\"", enIdx + 5); // next language or end
-                    if (enIdx != -1 && (nextLangIdx == -1 || nextLangIdx > json.indexOf("}", enIdx))) {
+                    if (enIdx != -1 && enIdx < json.indexOf("}", descRoot)) {
                         int valIdx = json.indexOf("\"value\"", enIdx);
                         if (valIdx != -1 && valIdx < json.indexOf("}", enIdx)) {
                             int colon = json.indexOf(':', valIdx);
@@ -392,53 +455,42 @@ public class WikipediaImportDialog extends JDialog {
                     }
                 }
                 // --- Birthday (P569) ---
-                int claimsIdx = json.indexOf("\"claims\"");
-                if (claimsIdx != -1) {
-                    // Find the P569 array inside claims
-                    Pattern p569ArrayPattern = Pattern.compile("\\\"P569\\\"\\s*:\\s*(\\[.*?\\])", Pattern.DOTALL);
-                    Matcher p569ArrayMatcher = p569ArrayPattern.matcher(json.substring(claimsIdx));
-                    if (p569ArrayMatcher.find()) {
-                        String p569Array = p569ArrayMatcher.group(1);
-                        // Now find all '"time":"+YYYY-MM-DD' inside this array
-                        Pattern timePattern = Pattern.compile("\"time\"\\s*:\\s*\"([+\\-]\\d{4}-\\d{2}-\\d{2})T");
-                        Matcher m = timePattern.matcher(p569Array);
-                        boolean found = false;
-                        while (m.find()) {
-                            String time = m.group(1); // e.g. +1906-04-28
-                            try {
-                                int year = Integer.parseInt(time.substring(1, 5));
-                                int month = Integer.parseInt(time.substring(6, 8));
-                                int day = Integer.parseInt(time.substring(9, 11));
-                                // Sanitize placeholder values from Wikidata
-                                if (month == 0) month = 1;
-                                if (day == 0) day = 1;
-                                // If the date is 1/1/YYYY, treat as unknown/null
-                                if (month == 1 && day == 1) {
-                                    dob = new OCCCDate(1, 1, 1);
-                                } else {
+                int p569Idx = json.indexOf("\"P569\"");
+                boolean foundDOB = false;
+                if (p569Idx != -1) {
+                    int timeIdx = json.indexOf("\"time\"", p569Idx);
+                    while (timeIdx != -1) {
+                        int quote1 = json.indexOf('"', timeIdx + 7);
+                        int quote2 = json.indexOf('"', quote1 + 1);
+                        if (quote1 != -1 && quote2 != -1) {
+                            String time = json.substring(quote1 + 1, quote2);
+                            if (time.length() >= 11) {
+                                try {
+                                    int year = Integer.parseInt(time.substring(1, 5));
+                                    int month = Integer.parseInt(time.substring(6, 8));
+                                    int day = Integer.parseInt(time.substring(9, 11));
+                                    if (month == 0) month = 1;
+                                    if (day == 0) day = 1;
                                     dob = new OCCCDate(day, month, year);
+                                    logger.accept("Wikidata birthdate: " + year + "-" + month + "-" + day);
+                                    foundDOB = true;
+                                    break;
+                                } catch (Exception parseEx) {
+                                    logger.accept("Wikidata date parse error: " + parseEx.getMessage());
                                 }
-                                logger.accept("Wikidata birthdate: " + year + "-" + month + "-" + day);
-                                found = true;
-                                break; // Use the first valid date
-                            } catch (Exception parseEx) {
-                                logger.accept("Wikidata date parse error: " + parseEx.getMessage());
                             }
                         }
-                        if (!found) {
-                            logger.accept("No valid 'time' field found for P569");
-                            logger.accept("Wikidata P569 array snippet: " + p569Array.substring(0, Math.min(p569Array.length(), 500)));
-                        }
-                    } else {
-                        logger.accept("No P569 (birthdate) property found");
-                        logger.accept("Wikidata claims snippet: " + json.substring(claimsIdx, Math.min(json.length(), claimsIdx + 2000)));
+                        // Look for next '"time"' after this one
+                        timeIdx = json.indexOf("\"time\"", quote2);
+                    }
+                    if (!foundDOB) {
+                        logger.accept("No valid 'time' field found for P569");
                     }
                 } else {
-                    logger.accept("No claims object found in Wikidata JSON");
-                    logger.accept("Wikidata JSON snippet: " + json.substring(0, Math.min(json.length(), 2000)));
+                    logger.accept("No P569 (birthdate) property found");
                 }
                 // --- Tags (occupations, P106) ---
-                Set<String> occIds = new LinkedHashSet<>();
+                Set<String> occcIds = new LinkedHashSet<>();
                 int claimsIdxForTags = json.indexOf("\"claims\"", entityIdx);
                 int p106Idx = json.indexOf("\"P106\"", claimsIdxForTags);
                 if (p106Idx != -1) {
@@ -450,40 +502,51 @@ public class WikipediaImportDialog extends JDialog {
                         int quote1 = json.indexOf('"', colon + 1);
                         int quote2 = json.indexOf('"', quote1 + 1);
                         if (quote1 == -1 || quote2 == -1) break;
-                        String occId = json.substring(quote1 + 1, quote2);
-                        if (!occId.startsWith("Q")) break;
-                        occIds.add(occId);
+                        String occcId = json.substring(quote1 + 1, quote2);
+                        if (!occcId.startsWith("Q")) break;
+                        occcIds.add(occcId);
                         searchIdx = quote2 + 1;
                     }
                 }
-                // Find the labels section for this entity
-                int labelsIdx = json.indexOf("\"labels\"", entityIdx);
-                for (String occId : occIds) {
-                    int occLabelIdx = json.indexOf("\"" + occId + "\"", labelsIdx);
-                    if (occLabelIdx != -1) {
-                        int enIdx = json.indexOf("\"en\"", occLabelIdx);
-                        if (enIdx != -1 && enIdx < json.indexOf("}", occLabelIdx)) {
-                            int valIdx = json.indexOf("\"value\"", enIdx);
-                            if (valIdx != -1) {
-                                int colon = json.indexOf(':', valIdx);
-                                int quote1 = json.indexOf('"', colon + 1);
-                                int quote2 = json.indexOf('"', quote1 + 1);
-                                if (quote1 != -1 && quote2 != -1) {
-                                    String label = json.substring(quote1 + 1, quote2);
-                                    tags.append("<").append(label).append(">");
-                                }
-                            }
-                        }
+                // Fetch occupation labels robustly
+                for (String occcId : occcIds) {
+                    // Try to find the label for this occupation QID
+                    Pattern occcLabelPattern = Pattern.compile("\"" + occcId + "\"\\s*:\\s*\\{[^}]*?\"en\"\\s*:\\s*\\{[^}]*?\"value\"\\s*:\\s*\"([^\"]+)\"", Pattern.DOTALL);
+                    Matcher occcLabelMatcher = occcLabelPattern.matcher(json);
+                    if (occcLabelMatcher.find()) {
+                        String label = occcLabelMatcher.group(1);
+                        occcTags.append("<").append(label).append(">");
                     }
                 }
-                if (tags.length() > 0) {
-                    logger.accept("Wikidata tags: " + tags);
+                if (occcTags.length() == 0) {
+                    logger.accept("No occupation tags found");
+                } else {
+                    logger.accept("Wikidata tags: " + occcTags);
                 }
             } catch (Exception e) {
                 logger.accept("Wikidata error: " + e.getMessage());
             }
+            // --- Fetch Wikipedia intro as description ---
+            try {
+                String apiUrl = "https://en.wikipedia.org/api/rest_v1/page/summary/" + java.net.URLEncoder.encode(pageTitle, "UTF-8");
+                String json = fetchHtml(apiUrl);
+                int extractIdx = json.indexOf("\"extract\"");
+                if (extractIdx != -1) {
+                    int colon = json.indexOf(':', extractIdx);
+                    int quote1 = json.indexOf('"', colon + 1);
+                    int quote2 = json.indexOf('"', quote1 + 1);
+                    if (quote1 != -1 && quote2 != -1) {
+                        intro = json.substring(quote1 + 1, quote2);
+                        if (!intro.isEmpty()) description = intro;
+                        logger.accept("Wikipedia intro: " + intro);
+                    }
+                }
+            } catch (Exception e) {
+                logger.accept("Wikipedia intro fetch error: " + e.getMessage());
+            }
         }
-        return new PersonWithMeta(new Person(first, last, dob), description, tags.toString());
+        // Use first/last from arguments (from PersonEntry)
+        return new PersonWithMeta(new Person(first, last, dob), description, occcTags.toString());
     }
 
     private String randomID(Random rand, int len) {
@@ -529,7 +592,7 @@ public class WikipediaImportDialog extends JDialog {
             boolean added = appController.getPeople().add(p, desc, tags);
             if (added) imported++;
         }
-        appController.notifyDataChanged();
+        appController.notifyDataChanged(); // Flag data as changed for save prompt
         JOptionPane.showMessageDialog(this, imported + " people imported.", "Import Complete", JOptionPane.INFORMATION_MESSAGE);
         SwingUtilities.invokeLater(() -> dispose());
     }
