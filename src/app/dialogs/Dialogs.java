@@ -1083,4 +1083,24 @@ public class Dialogs {
             return String.format("%.1f GB", size / (1024.0 * 1024 * 1024));
         }
     }
+
+    /**
+     * Show a helpful About dialog explaining the app and its modules.
+     */
+    public void showAboutDialog() {
+        String message = "<html><h2>Person Manager Application</h2>"
+            + "<p>This application helps you manage a list of people, including their names, dates of birth, government and student IDs, descriptions, and tags for filtering. "
+            + "You can import, export, filter, and edit people, as well as resolve conflicts and customize the theme.</p>"
+            + "<h3>Modules Overview:</h3>"
+            + "<ul>"
+            + "<li><b>List Module:</b> Browse, select, and view all people in the database.</li>"
+            + "<li><b>Filter Module:</b> Search and filter people by name, ID, or other criteria. Save and reuse custom filters.</li>"
+            + "<li><b>Viewer Module:</b> View and edit details for a selected person, including adding, updating, and deleting entries.</li>"
+            + "<li><b>Terminal Module:</b> Perform advanced or batch operations using commands for power users.</li>"
+            + "</ul>"
+            + "<p><b>General Usage:</b> Use the List and Filter modules to find people, the Viewer to edit them, and the Terminal for advanced tasks. All changes can be saved, imported, or exported as needed.</p>"
+            + "<p style='margin-top:8px;'><i>For more information, see the README or use the Help menu.</i></p>"
+            + "</html>";
+        JOptionPane.showMessageDialog(parentFrame, message, "About Person Manager", JOptionPane.INFORMATION_MESSAGE);
+    }
 }

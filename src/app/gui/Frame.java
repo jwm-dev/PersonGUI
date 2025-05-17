@@ -89,7 +89,7 @@ public class Frame extends JFrame {
         JMenu helpMenu = new FlatMenu("Help");
         helpMenu.setFont(helpMenu.getFont().deriveFont(Font.PLAIN, 15f));
         JMenuItem aboutItem = new FlatMenuItem("About");
-        aboutItem.addActionListener(_ -> JOptionPane.showMessageDialog(this, "Person Management System\nCreated for OCCC Java Course", "About", JOptionPane.INFORMATION_MESSAGE));
+        aboutItem.addActionListener(_ -> fileActions.showAboutDialog());
         helpMenu.add(aboutItem);
         // --- Add Menus to Bar with extra spacing ---
         menuBar.add(fileMenu);

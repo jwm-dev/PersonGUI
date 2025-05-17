@@ -139,28 +139,12 @@ public class PersonViewerImpl implements PViewer {
         gbc.gridy++;
         fieldsPanel.add(studentIDField, gbc);
         gbc.gridy++;
-        gbc.gridy++;
-        studentIDLabel.setForeground(UIManager.getColor("Viewer.foreground"));
-        fieldsPanel.add(studentIDLabel, gbc);
-        gbc.gridy++;
-        fieldsPanel.add(studentIDField, gbc);
-        gbc.gridy++;
-        // --- Description and tags panel (fills vertical space) ---
-        JPanel metaPanel = new JPanel(new GridBagLayout());
-        metaPanel.setOpaque(false);
-        GridBagConstraints mGbc = new GridBagConstraints();
-        mGbc.gridx = 0;
-        mGbc.gridy = 0;
-        mGbc.weightx = 1.0;
-        mGbc.fill = GridBagConstraints.HORIZONTAL;
-        mGbc.insets = new Insets(0, 0, 2, 0);
+        // --- Description area (center, expands) ---
+        JPanel descPanel = new JPanel(new BorderLayout());
+        descPanel.setOpaque(false);
         JLabel descLabel = new JLabel("Description");
         descLabel.setForeground(UIManager.getColor("Viewer.foreground"));
-        metaPanel.add(descLabel, mGbc);
-        mGbc.gridy++;
-        mGbc.weighty = 1.0;
-        mGbc.fill = GridBagConstraints.BOTH;
-        // Description area (fills vertical space)
+        descPanel.add(descLabel, BorderLayout.NORTH);
         descArea.setAlignmentX(Component.LEFT_ALIGNMENT);
         descArea.setLineWrap(true);
         descArea.setWrapStyleWord(true);
@@ -172,61 +156,60 @@ public class PersonViewerImpl implements PViewer {
         descScroll.setForeground(UIManager.getColor("Viewer.fieldForeground"));
         descScroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
         descScroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
-        metaPanel.add(descScroll, mGbc);
-        mGbc.gridy++;
-        mGbc.weighty = 0;
-        mGbc.fill = GridBagConstraints.HORIZONTAL;
+        descPanel.add(descScroll, BorderLayout.CENTER);
+        // --- Tag field and buttons (bottom) ---
+        JPanel tagAndButtonsPanel = new JPanel(new BorderLayout());
+        tagAndButtonsPanel.setOpaque(false);
+        // Tag label and field at the top
+        JPanel tagFieldPanel = new JPanel();
+        tagFieldPanel.setLayout(new BoxLayout(tagFieldPanel, BoxLayout.Y_AXIS));
+        tagFieldPanel.setOpaque(false);
         JLabel tagsLabel = new JLabel("Tags");
         tagsLabel.setForeground(UIManager.getColor("Viewer.foreground"));
-        metaPanel.add(tagsLabel, mGbc);
-        mGbc.gridy++;
-        // Tags field (single line)
-        tagsField.setAlignmentX(Component.LEFT_ALIGNMENT);
-        tagsField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 22));
+        tagFieldPanel.add(tagsLabel);
+        tagFieldPanel.add(Box.createVerticalStrut(4)); // Add space between label and field
+        tagsField.setMaximumSize(new Dimension(Integer.MAX_VALUE, tagsField.getPreferredSize().height));
+        tagsField.setPreferredSize(new Dimension(0, 22));
         tagsField.setMinimumSize(new Dimension(0, 22));
         tagsField.setBackground(UIManager.getColor("Viewer.fieldBackground"));
         tagsField.setForeground(UIManager.getColor("Viewer.fieldForeground"));
         tagsField.setBorder(UIManager.getBorder("TextField.border"));
-        metaPanel.add(tagsField, mGbc);
-        metaPanel.add(Box.createVerticalStrut(8));
-
-        // --- Add fieldsPanel and metaPanel to a wrapper with vertical stretch ---
-        JPanel centerPanel = new JPanel(new GridBagLayout());
-        centerPanel.setOpaque(false);
-        GridBagConstraints cGbc = new GridBagConstraints();
-        cGbc.gridx = 0;
-        cGbc.gridy = 0;
-        cGbc.weightx = 1.0;
-        cGbc.weighty = 0;
-        cGbc.fill = GridBagConstraints.HORIZONTAL;
-        centerPanel.add(fieldsPanel, cGbc);
-        cGbc.gridy++;
-        cGbc.weighty = 1.0;
-        cGbc.fill = GridBagConstraints.BOTH;
-        centerPanel.add(metaPanel, cGbc);
-        panel.add(centerPanel, BorderLayout.CENTER);
-
-        JPanel buttonPanel = new JPanel();
-        buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
-        buttonPanel.setBackground(UIManager.getColor("Viewer.background"));
-        // Use FlatButton for animated, original-style buttons
+        tagFieldPanel.add(tagsField);
+        tagFieldPanel.add(Box.createVerticalStrut(16)); // Add space between tags field and buttons
+        tagAndButtonsPanel.add(tagFieldPanel, BorderLayout.NORTH);
+        // Button panel at the bottom, always centered horizontally
+        JPanel buttonPanel = new JPanel(new GridBagLayout());
+        buttonPanel.setOpaque(false);
         addButton = new FlatButton("Add");
         updateButton = new FlatButton("Update");
         deleteButton = new FlatButton("Delete");
-        addButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-        updateButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-        deleteButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-        Dimension btnDim = new Dimension(Integer.MAX_VALUE, 22);
-        addButton.setMaximumSize(btnDim);
-        updateButton.setMaximumSize(btnDim);
-        deleteButton.setMaximumSize(btnDim);
-        buttonPanel.add(addButton);
-        buttonPanel.add(Box.createVerticalStrut(4));
-        buttonPanel.add(updateButton);
-        buttonPanel.add(Box.createVerticalStrut(4));
-        buttonPanel.add(deleteButton);
-        buttonPanel.setBorder(BorderFactory.createEmptyBorder(0, 6, 10, 6));
-        panel.add(buttonPanel, BorderLayout.SOUTH);
+        Dimension btnSize = new Dimension(120, 28);
+        addButton.setPreferredSize(btnSize);
+        updateButton.setPreferredSize(btnSize);
+        deleteButton.setPreferredSize(btnSize);
+        GridBagConstraints bgbc = new GridBagConstraints();
+        bgbc.gridy = 0;
+        bgbc.insets = new Insets(0, 8, 0, 8);
+        bgbc.anchor = GridBagConstraints.CENTER;
+        bgbc.fill = GridBagConstraints.NONE;
+        bgbc.gridx = 0;
+        buttonPanel.add(addButton, bgbc);
+        bgbc.gridx = 1;
+        buttonPanel.add(updateButton, bgbc);
+        bgbc.gridx = 2;
+        buttonPanel.add(deleteButton, bgbc);
+        // Add space above the button panel
+        JPanel buttonPanelWrapper = new JPanel(new BorderLayout());
+        buttonPanelWrapper.setOpaque(false);
+        buttonPanelWrapper.add(Box.createVerticalStrut(16), BorderLayout.NORTH);
+        buttonPanelWrapper.add(buttonPanel, BorderLayout.CENTER);
+        buttonPanelWrapper.add(Box.createVerticalStrut(12), BorderLayout.SOUTH); // Space below buttons
+        tagAndButtonsPanel.add(buttonPanelWrapper, BorderLayout.SOUTH);
+        // --- Compose main panel ---
+        panel.setLayout(new BorderLayout());
+        panel.add(fieldsPanel, BorderLayout.NORTH);
+        panel.add(descPanel, BorderLayout.CENTER);
+        panel.add(tagAndButtonsPanel, BorderLayout.SOUTH);
         // Remove hardcoded textFieldBg, textFieldInactiveBg, textFieldHighlightBg, textFieldHighlightBorder
         attachButtonActions();
         attachFieldListeners();
