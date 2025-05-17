@@ -101,6 +101,8 @@ public class Frame extends JFrame {
         // --- Window Controls (Linux-friendly) ---
         JPanel controlsPanel = createSimpleWindowControlsPanel(barHeight);
         menuBar.add(controlsPanel);
+        // Enable window dragging on the menu bar
+        enableWindowDragging(menuBar);
         return menuBar;
     }
 
@@ -183,6 +185,7 @@ public class Frame extends JFrame {
             }
         };
         setContentPane(mainPanel);
+        enableWindowResizing();
     }
 
     public void initializeUI(GUI pgui) {
@@ -721,5 +724,112 @@ public class Frame extends JFrame {
             }
             g2.dispose();
         }
+    }
+
+    private Point initialClick;
+    private void enableWindowDragging(JComponent dragComponent) {
+        dragComponent.addMouseListener(new MouseAdapter() {
+            public void mousePressed(MouseEvent e) {
+                initialClick = e.getPoint();
+            }
+        });
+        dragComponent.addMouseMotionListener(new MouseMotionAdapter() {
+            public void mouseDragged(MouseEvent e) {
+                if (initialClick != null) {
+                    int thisX = getLocation().x;
+                    int thisY = getLocation().y;
+                    int xMoved = e.getX() - initialClick.x;
+                    int yMoved = e.getY() - initialClick.y;
+                    setLocation(thisX + xMoved, thisY + yMoved);
+                }
+            }
+        });
+    }
+
+    // --- Custom window resizing for undecorated frame ---
+    private static final int RESIZE_MARGIN = 6;
+    private void enableWindowResizing() {
+        MouseAdapter resizeListener = new MouseAdapter() {
+            private int cursorType = Cursor.DEFAULT_CURSOR;
+            private Point startPt = null;
+            private Rectangle startBounds = null;
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                int w = getWidth(), h = getHeight();
+                int x = e.getX(), y = e.getY();
+                int c = Cursor.DEFAULT_CURSOR;
+                if (x < RESIZE_MARGIN && y < RESIZE_MARGIN) c = Cursor.NW_RESIZE_CURSOR;
+                else if (x > w - RESIZE_MARGIN && y < RESIZE_MARGIN) c = Cursor.NE_RESIZE_CURSOR;
+                else if (x < RESIZE_MARGIN && y > h - RESIZE_MARGIN) c = Cursor.SW_RESIZE_CURSOR;
+                else if (x > w - RESIZE_MARGIN && y > h - RESIZE_MARGIN) c = Cursor.SE_RESIZE_CURSOR;
+                else if (x < RESIZE_MARGIN) c = Cursor.W_RESIZE_CURSOR;
+                else if (x > w - RESIZE_MARGIN) c = Cursor.E_RESIZE_CURSOR;
+                else if (y < RESIZE_MARGIN) c = Cursor.N_RESIZE_CURSOR;
+                else if (y > h - RESIZE_MARGIN) c = Cursor.S_RESIZE_CURSOR;
+                setCursor(Cursor.getPredefinedCursor(c));
+                cursorType = c;
+            }
+            @Override
+            public void mousePressed(MouseEvent e) {
+                startPt = e.getPoint();
+                startBounds = getBounds();
+            }
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                if (startPt == null || startBounds == null) return;
+                int dx = e.getX() - startPt.x;
+                int dy = e.getY() - startPt.y;
+                Rectangle newBounds = new Rectangle(startBounds);
+                switch (cursorType) {
+                    case Cursor.E_RESIZE_CURSOR:
+                        newBounds.width += dx;
+                        break;
+                    case Cursor.S_RESIZE_CURSOR:
+                        newBounds.height += dy;
+                        break;
+                    case Cursor.SE_RESIZE_CURSOR:
+                        newBounds.width += dx;
+                        newBounds.height += dy;
+                        break;
+                    case Cursor.W_RESIZE_CURSOR:
+                        newBounds.x += dx;
+                        newBounds.width -= dx;
+                        break;
+                    case Cursor.N_RESIZE_CURSOR:
+                        newBounds.y += dy;
+                        newBounds.height -= dy;
+                        break;
+                    case Cursor.NE_RESIZE_CURSOR:
+                        newBounds.y += dy;
+                        newBounds.height -= dy;
+                        newBounds.width += dx;
+                        break;
+                    case Cursor.NW_RESIZE_CURSOR:
+                        newBounds.x += dx;
+                        newBounds.width -= dx;
+                        newBounds.y += dy;
+                        newBounds.height -= dy;
+                        break;
+                    case Cursor.SW_RESIZE_CURSOR:
+                        newBounds.x += dx;
+                        newBounds.width -= dx;
+                        newBounds.height += dy;
+                        break;
+                    default:
+                        return;
+                }
+                // Minimum size
+                if (newBounds.width < getMinimumSize().width) newBounds.width = getMinimumSize().width;
+                if (newBounds.height < getMinimumSize().height) newBounds.height = getMinimumSize().height;
+                setBounds(newBounds);
+            }
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                startPt = null;
+                startBounds = null;
+            }
+        };
+        this.addMouseListener(resizeListener);
+        this.addMouseMotionListener(resizeListener);
     }
 }
