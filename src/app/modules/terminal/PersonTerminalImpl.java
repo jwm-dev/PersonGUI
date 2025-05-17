@@ -960,6 +960,10 @@ public class PersonTerminalImpl extends JPanel implements PTerminal {
                         revalidate();
                         repaint();
                         inputField.setEditable(true);
+                        inputField.setFocusable(true);
+                        if (inputField.getCaret() != null) inputField.getCaret().setVisible(true);
+                        outputArea.setFocusable(true);
+                        if (outputArea.getCaret() != null) outputArea.getCaret().setVisible(true);
                         inputField.requestFocusInWindow();
                     });
                 }
