@@ -43,8 +43,8 @@ public class PersonTerminalImpl extends JPanel implements PTerminal {
         this.outputArea.setFont(UIManager.getFont("TextArea.font"));
         this.outputArea.setBackground(UIManager.getColor("Terminal.background"));
         this.outputArea.setForeground(UIManager.getColor("Terminal.foreground"));
-        this.outputArea.setLineWrap(false); // Disable line wrapping for ASCII art
-        this.outputArea.setWrapStyleWord(false);
+        this.outputArea.setLineWrap(true); // Enable line wrapping for normal terminal output
+        this.outputArea.setWrapStyleWord(true);
         this.outputArea.setTabSize(8); // Set tab size to 8 for ASCII art
         // Use Monospaced font if available in base Java
         this.outputArea.setFont(new java.awt.Font("Monospaced", java.awt.Font.PLAIN, 14));
@@ -426,7 +426,8 @@ public class PersonTerminalImpl extends JPanel implements PTerminal {
             var p = people.get(idx);
             appendOutput("First Name: " + p.getFirstName());
             appendOutput("Last Name: " + p.getLastName());
-            appendOutput("DOB: " + (p.getDOB() != null ? p.getDOB().toString() : ""));
+            // Use AppController's date format for DOB
+            appendOutput("DOB: " + manager.formatDate(p.getDOB()));
             if (p instanceof src.person.RegisteredPerson reg) {
                 appendOutput("GovID: " + reg.getGovID());
                 if (p instanceof src.person.OCCCPerson occc) {
@@ -580,7 +581,9 @@ public class PersonTerminalImpl extends JPanel implements PTerminal {
         } else {
             for (int i = 0; i < people.size(); i++) {
                 var p = people.get(i);
-                appendOutput((i+1) + ". " + p.getFirstName() + " " + p.getLastName());
+                // Use AppController's date format for DOB
+                String dobStr = manager.formatDate(p.getDOB());
+                appendOutput((i+1) + ". " + p.getFirstName() + " " + p.getLastName() + " | DOB: " + dobStr);
             }
         }
     }
@@ -627,8 +630,10 @@ public class PersonTerminalImpl extends JPanel implements PTerminal {
             for (int i = 0; i < people.size(); i++) {
                 var p = people.get(i);
                 String personStr = p.getFirstName() + " " + p.getLastName();
-                if (personStr.toLowerCase().contains(pattern) || (p.getDOB() != null && p.getDOB().toString().toLowerCase().contains(pattern))) {
-                    appendOutput((i+1) + ". " + personStr);
+                // Use AppController's date format for DOB
+                String dobStr = manager.formatDate(p.getDOB());
+                if (personStr.toLowerCase().contains(pattern) || (dobStr != null && dobStr.toLowerCase().contains(pattern))) {
+                    appendOutput((i+1) + ". " + personStr + " | DOB: " + dobStr);
                     found = true;
                 }
             }

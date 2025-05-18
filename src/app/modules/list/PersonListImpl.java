@@ -19,7 +19,7 @@ import java.util.function.Predicate;
 /**
  * Implementation of the PList interface that displays all Person objects in a sortable table
  */
-public class PersonListImpl extends JPanel implements PList, AppController.DataChangeListener {
+public class PersonListImpl extends JPanel implements PList, AppController.DataChangeListener, AppController.DateFormatChangeListener {
     private JTable personTable;
     private DefaultTableModel tableModel;
     private TableRowSorter<DefaultTableModel> sorter;
@@ -39,6 +39,7 @@ public class PersonListImpl extends JPanel implements PList, AppController.DataC
     public PersonListImpl(AppController manager) {
         this.dataManager = manager;
         manager.addDataChangeListener(this);
+        manager.addDateFormatChangeListener(this);
         setLayout(new BorderLayout());
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         // --- THEME: Set background/foreground from UIManager ---
@@ -217,11 +218,13 @@ public class PersonListImpl extends JPanel implements PList, AppController.DataC
                         type = "Registered Person";
                         govID = ((RegisteredPerson) person).getGovID();
                     }
+                    // Format DOB using AppController's current date format
+                    String dobStr = dataManager.formatDate(person.getDOB());
                     tableModel.addRow(new Object[]{
                         type,
                         person.getFirstName(),
                         person.getLastName(),
-                        person.getDOB(),
+                        dobStr,
                         person.getAge(),
                         govID,
                         studentID
@@ -259,11 +262,13 @@ public class PersonListImpl extends JPanel implements PList, AppController.DataC
                         type = "Registered Person";
                         govID = ((RegisteredPerson) person).getGovID();
                     }
+                    // Format DOB using AppController's current date format
+                    String dobStr = dataManager.formatDate(person.getDOB());
                     tableModel.addRow(new Object[]{
                         type,
                         person.getFirstName(),
                         person.getLastName(),
-                        person.getDOB(),
+                        dobStr,
                         person.getAge(),
                         govID,
                         studentID
@@ -358,6 +363,16 @@ public class PersonListImpl extends JPanel implements PList, AppController.DataC
             refreshList();
         }
         updateTitleLabel();
+    }
+
+    // Called when the date format changes
+    @Override
+    public void onDateFormatChanged() {
+        if (currentFilter != null) {
+            applyFilter(currentFilter);
+        } else {
+            refreshList();
+        }
     }
 
     @Override
@@ -561,5 +576,11 @@ public class PersonListImpl extends JPanel implements PList, AppController.DataC
                 fadeTimer.start();
             }
         };
+    }
+
+    @Override
+    public int getListSize() {
+        People people = dataManager.getPeople();
+        return (people != null) ? people.size() : 0;
     }
 }

@@ -10,6 +10,8 @@ import java.io.File;
  */
 public class PersonApp {
     public static void main(String[] args) {
+        // Force all JPopupMenus to be heavyweight for reliable event handling on Linux
+        javax.swing.JPopupMenu.setDefaultLightWeightPopupEnabled(false);
         SwingUtilities.invokeLater(() -> {
             AppController appController = new AppController();
             File configFile = new File("data/.config/config");

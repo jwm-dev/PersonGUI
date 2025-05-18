@@ -23,4 +23,6 @@ public interface PList {
      * Get the main list panel (for theming)
      */
     javax.swing.JPanel getPanel();
+    // Add method to get the number of people in the list
+    int getListSize();
 }

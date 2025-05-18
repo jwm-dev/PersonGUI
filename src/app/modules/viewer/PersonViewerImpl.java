@@ -4,6 +4,8 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
 import src.app.AppController;
@@ -17,7 +19,7 @@ import src.person.RegisteredPerson;
 /**
  * Implementation of the PViewer API interface, merging all viewer logic and UI.
  */
-public class PersonViewerImpl implements PViewer {
+public class PersonViewerImpl implements PViewer, AppController.DateFormatChangeListener {
     private final JPanel panel;
     private final JTextField firstNameField;
     private final JTextField lastNameField;
@@ -44,6 +46,7 @@ public class PersonViewerImpl implements PViewer {
     public PersonViewerImpl(JFrame parent, AppController manager) {
         this.parent = parent;
         this.appController = manager;
+        manager.addDateFormatChangeListener(this);
 
         // Initialize all final fields before use
         this.firstNameField = new JTextField();
@@ -73,12 +76,13 @@ public class PersonViewerImpl implements PViewer {
                 if (descArea != null) {
                     descArea.setBackground(UIManager.getColor("Viewer.fieldBackground"));
                     descArea.setForeground(UIManager.getColor("Viewer.fieldForeground"));
-                    descArea.setBorder(UIManager.getBorder("TextField.border"));
                     if (descArea.getParent() instanceof JScrollPane descScroll) {
                         descScroll.setBackground(UIManager.getColor("Viewer.fieldBackground"));
                         descScroll.setForeground(UIManager.getColor("Viewer.fieldForeground"));
                     }
                 }
+                // Ensure calendar dialog is closed and recreated with the new theme
+                refreshCalendarTheme();
             }
             private void updateComponentThemeRecursively(Component comp) {
                 if (comp instanceof JPanel) {
@@ -127,7 +131,7 @@ public class PersonViewerImpl implements PViewer {
         dobLabel.setForeground(UIManager.getColor("Viewer.foreground"));
         fieldsPanel.add(dobLabel, gbc);
         gbc.gridy++;
-        fieldsPanel.add(dobField, gbc);
+        fieldsPanel.add(createDOBFieldWithCalendar(), gbc);
         gbc.gridy++;
         govIDLabel.setForeground(UIManager.getColor("Viewer.foreground"));
         fieldsPanel.add(govIDLabel, gbc);
@@ -349,7 +353,8 @@ public class PersonViewerImpl implements PViewer {
         firstNameField.setText(person.getFirstName());
         lastNameField.setText(person.getLastName());
         OCCCDate dob = person.getDOB();
-        String formattedDate = String.format("%02d/%02d/%04d", dob.getMonthNumber(), dob.getDayOfMonth(), dob.getYear());
+        // Format DOB using AppController's current date format
+        String formattedDate = appController.formatDate(dob);
         dobField.setText(formattedDate);
         govIDField.setText("");
         studentIDField.setText("");
@@ -459,13 +464,28 @@ public class PersonViewerImpl implements PViewer {
             String studentID = studentIDField.getText().trim();
             String desc = descArea.getText().trim();
             String tags = tagsField.getText().trim();
+            try {
+                OCCCDate parsedDOB = parseDOBField();
+                dob = appController.formatDate(parsedDOB); // Normalize to formatted string
+            } catch (Exception ex) {
+                String msg = ex.getMessage();
+                if (msg == null || !msg.toLowerCase().contains("date format")) {
+                    msg = "Invalid date format.";
+                }
+                msg += "\nExpected format: " + getCurrentDateFormatExample();
+                JOptionPane.showMessageDialog(parent, msg, "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
             AppController.AddResult result = appController.addPersonFromFields(firstName, lastName, dob, govID, studentID, desc, tags);
             if (result.success) {
-                // No need to find idx or updateMeta, already handled in addPersonFromFields
                 JOptionPane.showMessageDialog(parent, "Person added successfully");
                 clearFields();
             } else {
-                JOptionPane.showMessageDialog(parent, result.errorMessage, "Error", JOptionPane.ERROR_MESSAGE);
+                String msg = result.errorMessage;
+                if (msg != null && msg.toLowerCase().contains("date format")) {
+                    msg += "\nExpected format: " + getCurrentDateFormatExample();
+                }
+                JOptionPane.showMessageDialog(parent, msg, "Error", JOptionPane.ERROR_MESSAGE);
             }
         });
         updateButton.addActionListener(_ -> {
@@ -479,12 +499,28 @@ public class PersonViewerImpl implements PViewer {
             String studentID = studentIDField.getText().trim();
             String desc = descArea.getText().trim();
             String tags = tagsField.getText().trim();
+            try {
+                OCCCDate parsedDOB = parseDOBField();
+                dob = appController.formatDate(parsedDOB);
+            } catch (Exception ex) {
+                String msg = ex.getMessage();
+                if (msg == null || !msg.toLowerCase().contains("date format")) {
+                    msg = "Invalid date format.";
+                }
+                msg += "\nExpected format: " + getCurrentDateFormatExample();
+                JOptionPane.showMessageDialog(parent, msg, "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
             AppController.AddResult result = appController.updatePersonFromFields(index, firstName, lastName, dob, govID, studentID, desc, tags);
             if (result.success) {
                 JOptionPane.showMessageDialog(parent, "Person updated successfully");
                 clearFields();
             } else {
-                JOptionPane.showMessageDialog(parent, result.errorMessage, "Error", JOptionPane.ERROR_MESSAGE);
+                String msg = result.errorMessage;
+                if (msg != null && msg.toLowerCase().contains("date format")) {
+                    msg += "\nExpected format: " + getCurrentDateFormatExample();
+                }
+                JOptionPane.showMessageDialog(parent, msg, "Error", JOptionPane.ERROR_MESSAGE);
             }
         });
         deleteButton.addActionListener(_ -> {
@@ -500,6 +536,15 @@ public class PersonViewerImpl implements PViewer {
                 }
             }
         });
+    }
+    private String getCurrentDateFormatExample() {
+        AppController.DateFormatType fmt = appController.getDateFormat();
+        switch (fmt) {
+            case US: return "MM/dd/yyyy (e.g. 05/17/2025)";
+            case EURO: return "dd/MM/yyyy (e.g. 17/05/2025)";
+            case ISO: return "yyyy-MM-dd (e.g. 2025-05-17)";
+            default: return "MM/dd/yyyy (e.g. 05/17/2025)";
+        }
     }
     private void attachFieldListeners() {
         govIDField.getDocument().addDocumentListener(new DocumentListener() {
@@ -602,16 +647,14 @@ public class PersonViewerImpl implements PViewer {
         // Do not touch borders here!
     }
 
-    /**
-     * Call this after a theme change to ensure all field borders and colors update to the new theme.
-     */
-    public void refreshFieldBordersForTheme() {
-        applyThemeToTextFields();
-        // Force repaint for all fields and scroll
-        JTextField[] fields = {firstNameField, lastNameField, dobField, govIDField, studentIDField, tagsField};
-        for (JTextField field : fields) field.repaint();
-        if (descScroll != null) descScroll.repaint();
-        if (descArea != null) descArea.repaint();
+    // Helper to parse DOB field using the current date format
+    private OCCCDate parseDOBField() throws Exception {
+        String dob = dobField.getText().trim();
+        // For ISO, allow both yyyy-MM-dd and yyyy/MM/dd for user convenience
+        if (appController.getDateFormat() == AppController.DateFormatType.ISO) {
+            dob = dob.replace('/', '-');
+        }
+        return appController.parseDateWithCurrentFormat(dob);
     }
 
     /**
@@ -633,6 +676,38 @@ public class PersonViewerImpl implements PViewer {
         if (descArea != null) descArea.updateUI();
         if (panel != null) panel.updateUI();
         // No need to update button theme colors, handled by global UI
+        refreshCalendarTheme(); // Ensure calendar dialog is rethemed if open
+    }
+
+    /**
+     * Ensures the calendar dialog (if open) is rethemed to match the current UI theme.
+     */
+    private void refreshCalendarTheme() {
+        if (calendarDialog != null && calendarDialog.isVisible()) {
+            calendarDialog.setVisible(false);
+            calendarDialog.dispose();
+            calendarDialog = null;
+        }
+    }
+
+    /**
+     * Call this after a theme change to ensure all field borders and colors update to the new theme.
+     */
+    public void refreshFieldBordersForTheme() {
+        applyThemeToTextFields();
+        // Force repaint for all fields and scroll
+        JTextField[] fields = {firstNameField, lastNameField, dobField, govIDField, studentIDField, tagsField};
+        for (JTextField field : fields) field.repaint();
+        if (descScroll != null) descScroll.repaint();
+        if (descArea != null) descArea.repaint();
+        refreshCalendarTheme(); // Also retheme calendar dialog if open
+    }
+
+    /**
+     * Call this after a theme change to ensure all viewer UI and popups are updated.
+     */
+    public void onThemeChanged() {
+        refreshFieldBordersForTheme();
     }
 
     public class PersonViewerPanel extends JPanel implements Scrollable {
@@ -659,5 +734,272 @@ public class PersonViewerImpl implements PViewer {
         public boolean getScrollableTracksViewportHeight() {
             return true;
         }
+    }
+
+    // Replace SimpleCalendarPopup with a JDialog-based popup
+    private class CalendarDialog extends JDialog {
+        private JPanel calendarPanel;
+        private JComboBox<Integer> yearBox;
+        private JComboBox<String> monthBox;
+        private JPanel daysPanel;
+        private java.util.Calendar selectedCal;
+        private final java.util.function.Consumer<java.util.Calendar> onDateSelected;
+        private final String[] monthNames = new java.text.DateFormatSymbols().getMonths();
+        public CalendarDialog(JFrame parent, java.util.Calendar initial, java.util.function.Consumer<java.util.Calendar> onDateSelected) {
+            super(parent, false);
+            this.onDateSelected = onDateSelected;
+            setUndecorated(true);
+            setFocusableWindowState(false);
+            selectedCal = (java.util.Calendar) initial.clone();
+            calendarPanel = new JPanel(new BorderLayout());
+            daysPanel = new JPanel(new GridLayout(0, 7));
+            // Year range: 1900 to current year + 10
+            int currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR);
+            java.util.List<Integer> years = new java.util.ArrayList<>();
+            for (int y = 1900; y <= currentYear + 10; y++) years.add(y);
+            yearBox = new JComboBox<>(years.toArray(new Integer[0]));
+            yearBox.setSelectedItem(initial.get(java.util.Calendar.YEAR));
+            yearBox.addActionListener(_ -> updateCalendar());
+            monthBox = new JComboBox<>();
+            for (int i = 0; i < 12; i++) monthBox.addItem(monthNames[i]);
+            monthBox.setSelectedIndex(initial.get(java.util.Calendar.MONTH));
+            monthBox.addActionListener(_ -> updateCalendar());
+            JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 2));
+            topPanel.setOpaque(false);
+            topPanel.add(monthBox);
+            topPanel.add(yearBox);
+            calendarPanel.add(topPanel, BorderLayout.NORTH);
+            daysPanel.setOpaque(false);
+            calendarPanel.add(daysPanel, BorderLayout.CENTER);
+            calendarPanel.setOpaque(false);
+            add(calendarPanel);
+            applyTheme();
+            setPreferredSize(new Dimension(220, 220));
+            updateCalendar();
+            pack();
+        }
+        private void updateCalendar() {
+            int year = (Integer) yearBox.getSelectedItem();
+            int month = monthBox.getSelectedIndex();
+            selectedCal.set(java.util.Calendar.YEAR, year);
+            selectedCal.set(java.util.Calendar.MONTH, month);
+            selectedCal.set(java.util.Calendar.DAY_OF_MONTH, 1);
+            daysPanel.removeAll();
+            String[] weekDays = {"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"};
+            for (String wd : weekDays) {
+                JLabel lbl = new JLabel(wd, SwingConstants.CENTER);
+                lbl.setFont(lbl.getFont().deriveFont(Font.BOLD));
+                daysPanel.add(lbl);
+            }
+            int firstDay = selectedCal.get(java.util.Calendar.DAY_OF_WEEK);
+            int daysInMonth = selectedCal.getActualMaximum(java.util.Calendar.DAY_OF_MONTH);
+            for (int i = 1; i < firstDay; i++) daysPanel.add(new JLabel(""));
+            for (int d = 1; d <= daysInMonth; d++) {
+                FlatButton btn = new FlatButton(String.valueOf(d));
+                btn.setFont(btn.getFont().deriveFont(Font.PLAIN));
+                btn.setBackground(UIManager.getColor("Viewer.fieldBackground"));
+                btn.setForeground(UIManager.getColor("Viewer.fieldForeground"));
+                btn.setBorder(BorderFactory.createEmptyBorder(2,2,2,2));
+                btn.addActionListener(_ -> {
+                    selectedCal.set(java.util.Calendar.DAY_OF_MONTH, Integer.parseInt(btn.getText()));
+                    onDateSelected.accept((java.util.Calendar) selectedCal.clone());
+                    setVisible(false);
+                });
+                daysPanel.add(btn);
+            }
+            daysPanel.revalidate();
+            daysPanel.repaint();
+        }
+        public void applyTheme() {
+            Color fieldBg = UIManager.getColor("Viewer.fieldBackground");
+            Color fieldFg = UIManager.getColor("Viewer.fieldForeground");
+            setBackground(fieldBg);
+            calendarPanel.setBackground(fieldBg);
+            daysPanel.setBackground(fieldBg);
+            yearBox.setBackground(fieldBg);
+            yearBox.setForeground(fieldFg);
+            monthBox.setBackground(fieldBg);
+            monthBox.setForeground(fieldFg);
+            // Ensure the content pane background is set and opaque
+            getContentPane().setBackground(fieldBg);
+            if (getContentPane() instanceof JComponent) {
+                ((JComponent) getContentPane()).setOpaque(true);
+            }
+            // --- Fix: force popup list background/foreground for combo boxes ---
+            updateComboPopupColors(yearBox, fieldBg, fieldFg);
+            updateComboPopupColors(monthBox, fieldBg, fieldFg);
+            // Force UI update for dialog and combo boxes to apply new theme
+            yearBox.updateUI();
+            monthBox.updateUI();
+            calendarPanel.updateUI();
+            daysPanel.updateUI();
+            // Refresh the dialog itself
+            this.repaint();
+            this.revalidate();
+        }
+        // Helper to update popup list colors for JComboBox
+        private void updateComboPopupColors(JComboBox<?> box, Color bg, Color fg) {
+            Object comp = box.getUI().getAccessibleChild(box, 0);
+            if (comp instanceof JPopupMenu popup) {
+                Component scroller = popup.getComponent(0);
+                if (scroller instanceof JScrollPane scrollPane) {
+                    JViewport viewport = scrollPane.getViewport();
+                    Component view = viewport.getView();
+                    if (view instanceof JList<?> list) {
+                        list.setBackground(bg);
+                        list.setForeground(fg);
+                        list.updateUI();
+                    }
+                }
+            }
+        }
+    }
+
+    private CalendarDialog calendarDialog;
+
+    private JPanel createDOBFieldWithCalendar() {
+        JPanel panel = new JPanel(null) {
+            @Override
+            public void doLayout() {
+                int w = getWidth();
+                int h = getHeight();
+                int btnW = 28;
+                dobField.setBounds(0, 0, w - btnW, h);
+                calendarButton.setBounds(w - btnW, 0, btnW, h);
+            }
+            @Override
+            public Dimension getPreferredSize() {
+                Dimension d = dobField.getPreferredSize();
+                return new Dimension(d.width + 28, d.height);
+            }
+        };
+        panel.setOpaque(false);
+        dobField.setBorder(UIManager.getBorder("TextField.border"));
+        panel.add(dobField);
+        panel.add(calendarButton);
+        calendarButton.setFocusable(false);
+        calendarButton.setMargin(new Insets(0, 0, 0, 0));
+        calendarButton.setBorderPainted(false);
+        calendarButton.setContentAreaFilled(false);
+        calendarButton.setToolTipText("Pick a date");
+        for (var l : calendarButton.getActionListeners()) calendarButton.removeActionListener(l);
+        for (var ml : calendarButton.getMouseListeners()) calendarButton.removeMouseListener(ml);
+        calendarButton.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent e) {
+                showCalendarDialog();
+            }
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
+                showCalendarDialog();
+            }
+        });
+        return panel;
+    }
+    private void showCalendarDialog() {
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        java.util.Date date = parseDOBFieldToDate();
+        if (date != null) cal.setTime(date);
+        if (calendarDialog != null && calendarDialog.isVisible()) {
+            calendarDialog.setVisible(false);
+        }
+        calendarDialog = new CalendarDialog(parent, cal, picked -> {
+            dobField.setText(formatCalendarDate(picked));
+            calendarDialog.setVisible(false);
+        });
+        calendarDialog.applyTheme(); // Ensure theme is applied immediately
+        // Only add mouse listeners to the main panel, not to combo boxes or their popups
+        final boolean[] mouseOverDialog = {false};
+        final javax.swing.Timer[] closeTimer = {null};
+        MouseAdapter dialogHoverListener = new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                mouseOverDialog[0] = true;
+                if (closeTimer[0] != null && closeTimer[0].isRunning()) closeTimer[0].stop();
+            }
+            @Override
+            public void mouseExited(MouseEvent e) {
+                Point mouse = MouseInfo.getPointerInfo().getLocation();
+                SwingUtilities.convertPointFromScreen(mouse, calendarDialog.getContentPane());
+                if (!calendarDialog.getContentPane().contains(mouse)) {
+                    mouseOverDialog[0] = false;
+                    if (closeTimer[0] == null) {
+                        closeTimer[0] = new javax.swing.Timer(150, _ -> {
+                            if (!mouseOverDialog[0] && calendarDialog != null && calendarDialog.isVisible()) {
+                                calendarDialog.setVisible(false);
+                            }
+                        });
+                        closeTimer[0].setRepeats(false);
+                    }
+                    closeTimer[0].restart();
+                }
+            }
+        };
+        // Only add to the main calendarPanel, not recursively
+        calendarDialog.calendarPanel.addMouseListener(dialogHoverListener);
+        // --- Improved positioning ---
+        Point btnLoc = new Point(0, calendarButton.getHeight());
+        SwingUtilities.convertPointToScreen(btnLoc, calendarButton);
+        Dimension dialogSize = calendarDialog.getPreferredSize();
+        Rectangle parentBounds = parent.getBounds();
+        Point parentLocOnScreen = parent.getLocationOnScreen();
+        Rectangle parentScreenBounds = new Rectangle(parentLocOnScreen.x, parentLocOnScreen.y, parentBounds.width, parentBounds.height);
+        int x = btnLoc.x;
+        int y = btnLoc.y;
+        if (x + dialogSize.width > parentScreenBounds.x + parentScreenBounds.width) {
+            x = parentScreenBounds.x + parentScreenBounds.width - dialogSize.width;
+        }
+        if (x < parentScreenBounds.x) {
+            x = parentScreenBounds.x;
+        }
+        if (y + dialogSize.height > parentScreenBounds.y + parentScreenBounds.height) {
+            y = btnLoc.y - dialogSize.height - calendarButton.getHeight(); // show above if not enough space below
+        }
+        if (y < parentScreenBounds.y) {
+            y = parentScreenBounds.y;
+        }
+        calendarDialog.setLocation(x, y);
+        calendarDialog.setVisible(true);
+    }
+    // Recursively add mouse listeners to all components in the dialog
+    private void addMouseListenerRecursively(Component comp, MouseAdapter listener) {
+        comp.addMouseListener(listener);
+        if (comp instanceof Container) {
+            for (Component child : ((Container) comp).getComponents()) {
+                addMouseListenerRecursively(child, listener);
+            }
+        }
+    }
+
+    private java.util.Date parseDOBFieldToDate() {
+        String dobText = dobField.getText().trim();
+        if (dobText.isEmpty()) return null;
+        try {
+            OCCCDate occcDate = appController.parseDateWithCurrentFormat(dobText);
+            // Convert OCCCDate to java.util.Date using GregorianCalendar
+            java.util.GregorianCalendar gc = new java.util.GregorianCalendar(
+                occcDate.getYear(), occcDate.getMonthNumber() - 1, occcDate.getDayOfMonth()
+            );
+            return gc.getTime();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String formatCalendarDate(java.util.Calendar cal) {
+        // Create OCCCDate from Calendar fields
+        OCCCDate occcDate = new OCCCDate(
+            cal.get(java.util.Calendar.DAY_OF_MONTH),
+            cal.get(java.util.Calendar.MONTH) + 1,
+            cal.get(java.util.Calendar.YEAR)
+        );
+        return appController.formatDate(occcDate);
+    }
+
+    private final FlatButton calendarButton = new FlatButton("Cal"); // Changed from emoji to text for compatibility
+
+    @Override
+    public void onDateFormatChanged() {
+        updateUI(); // Re-apply theme and update calendar if open
     }
 }

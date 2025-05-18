@@ -39,6 +39,10 @@ public class Frame extends JFrame {
     private JPanel mainPanel;
 
     // --- Menu Bar Creation ---
+    // Save/Save As/Export As menu items as fields for dynamic enable/disable
+    private JMenuItem saveItem;
+    private JMenuItem saveAsItem;
+    private JMenuItem exportAsItem;
     private JMenuBar createMainMenuBar() {
         FlatMenuBar menuBar = new FlatMenuBar();
         menuBar.setLayout(new BoxLayout(menuBar, BoxLayout.X_AXIS));
@@ -51,9 +55,9 @@ public class Frame extends JFrame {
         fileMenu.setFont(fileMenu.getFont().deriveFont(Font.PLAIN, 15f));
         JMenuItem newItem = new FlatMenuItem("New");
         JMenuItem openItem = new FlatMenuItem("Open...");
-        JMenuItem saveItem = new FlatMenuItem("Save");
-        JMenuItem saveAsItem = new FlatMenuItem("Save As...");
-        JMenuItem exportAsItem = new FlatMenuItem("Export As...");
+        saveItem = new FlatMenuItem("Save");
+        saveAsItem = new FlatMenuItem("Save As...");
+        exportAsItem = new FlatMenuItem("Export As...");
         JMenuItem importItem = new FlatMenuItem("Import...");
         JMenuItem exitItem = new FlatMenuItem("Exit");
         newItem.addActionListener(_ -> fileActions.doNew(personModule::clearFields, listModule::clearSelection));
@@ -85,6 +89,10 @@ public class Frame extends JFrame {
         JMenuItem wikiImportItem = new FlatMenuItem("Import from Wikipedia...");
         wikiImportItem.addActionListener(_ -> src.app.dialogs.WikipediaImportDialog.showDialog(this, appController));
         settingsMenu.add(wikiImportItem);
+        // Add Change Date Format item
+        JMenuItem dateFormatItem = new FlatMenuItem("Change Date Format...");
+        dateFormatItem.addActionListener(_ -> src.app.dialogs.DateFormatDialog.showDialog(this, appController));
+        settingsMenu.add(dateFormatItem);
         // --- Help Menu ---
         JMenu helpMenu = new FlatMenu("Help");
         helpMenu.setFont(helpMenu.getFont().deriveFont(Font.PLAIN, 15f));
@@ -208,8 +216,34 @@ public class Frame extends JFrame {
             splitPane.setDividerLocation(appController.getSidebarWidth());
         });
         setupFieldChangeListeners();
+        // Connect viewer field change to Save/Save As enable/disable
+        if (personModule != null) {
+            personModule.addTextFieldChangeListener(() -> {
+                boolean partial = personModule.hasPartialData();
+                updateSaveMenuItems(partial);
+            });
+            // Set initial state
+            updateSaveMenuItems(personModule.hasPartialData());
+        }
+        // Listen for list changes to update Save/Save As state
+        if (listModule != null && listModule instanceof src.app.modules.list.PersonListImpl) {
+            appController.addDataChangeListener(() -> {
+                boolean partial = personModule != null && personModule.hasPartialData();
+                updateSaveMenuItems(partial);
+            });
+        }
         // Remove pgui.refreshAllUI();
         mainPanel.updateUI(); // Ensure theming is applied at startup
+    }
+
+    // Method to update Save/Save As enabled state
+    public void updateSaveMenuItems(boolean hasPartialData) {
+        boolean listEmpty = (listModule != null && listModule.getListSize() == 0);
+        boolean noChanges = (appController != null && !appController.isModified());
+        boolean disable = hasPartialData || listEmpty || noChanges;
+        if (saveItem != null) saveItem.setEnabled(!disable);
+        if (saveAsItem != null) saveAsItem.setEnabled(!disable);
+        if (exportAsItem != null) exportAsItem.setEnabled(!disable);
     }
 
     private void saveConfig() {

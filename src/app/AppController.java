@@ -55,6 +55,10 @@ public class AppController {
         filterModule.setFilterListener(listModule::applyFilter);
         filterModule.setOperations(dialogsModule);
         filterModule.setListModule(listModule);
+        // Only set AppController if implementation supports it
+        if (filterModule instanceof src.app.modules.filter.PersonFilterImpl impl) {
+            impl.setAppController(this);
+        }
     }
 
     // --- Config/Theme Management ---
@@ -71,6 +75,13 @@ public class AppController {
         windowWidth = Integer.parseInt(props.getProperty("WINDOW_WIDTH", String.valueOf(DEFAULT_WINDOW_WIDTH)));
         windowHeight = Integer.parseInt(props.getProperty("WINDOW_HEIGHT", String.valueOf(DEFAULT_WINDOW_HEIGHT)));
         themeName = props.getProperty("THEME", DEFAULT_THEME);
+        // Load date format from config, default to US
+        String dateFmt = props.getProperty("DATE_FORMAT", "US");
+        try {
+            dateFormat = DateFormatType.valueOf(dateFmt);
+        } catch (Exception e) {
+            dateFormat = DateFormatType.US;
+        }
         loadTheme(themeName);
     }
     public void saveConfig(File configFile) {
@@ -81,6 +92,8 @@ public class AppController {
         props.setProperty("WINDOW_WIDTH", String.valueOf(windowWidth));
         props.setProperty("WINDOW_HEIGHT", String.valueOf(windowHeight));
         props.setProperty("THEME", themeName);
+        // Save date format to config
+        props.setProperty("DATE_FORMAT", dateFormat.name());
         try (FileOutputStream fos = new FileOutputStream(configFile)) {
             props.store(fos, "User config updated on " + new Date());
         } catch (Exception ignored) {}
@@ -110,6 +123,26 @@ public class AppController {
     public int getWindowHeight() { return windowHeight; }
     public void setWindowHeight(int h) { windowHeight = h; }
     public String getThemeName() { return themeName; }
+
+    // --- Date Format Support ---
+    public enum DateFormatType { US, EURO, ISO }
+    private DateFormatType dateFormat = DateFormatType.US;
+
+    // --- Date Format Change Notification ---
+    public interface DateFormatChangeListener { void onDateFormatChanged(); }
+    private final List<DateFormatChangeListener> dateFormatListeners = new ArrayList<>();
+    public void addDateFormatChangeListener(DateFormatChangeListener l) { if (l != null && !dateFormatListeners.contains(l)) dateFormatListeners.add(l); }
+    public void removeDateFormatChangeListener(DateFormatChangeListener l) { dateFormatListeners.remove(l); }
+    private void notifyDateFormatChanged() { dateFormatListeners.forEach(DateFormatChangeListener::onDateFormatChanged); }
+
+    public DateFormatType getDateFormat() { return dateFormat; }
+    public void setDateFormat(DateFormatType fmt) {
+        if (fmt != null && dateFormat != fmt) {
+            dateFormat = fmt;
+            saveConfig(new File(CONFIG_PATH)); // Save the new date format immediately
+            notifyDateFormatChanged();
+        }
+    }
 
     // --- Data Change Notification ---
     public interface DataChangeListener { void onDataChanged(); }
@@ -143,7 +176,7 @@ public class AppController {
         return people.size();
     }
     public int saveToFile(File file) throws IOException {
-        if (file == null) throw new IllegalArgumentException("File cannot be null");
+        if (file == null) return 0; // Defensive: do nothing if file is null
         try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(file))) {
             oos.writeObject(people);
         }
@@ -199,7 +232,7 @@ public class AppController {
     private String validatePersonFields(String first, String last, String dobStr, String govID, String studentID, int idx) {
         if (first == null || first.trim().isEmpty()) return "First Name cannot be empty.";
         if (last == null || last.trim().isEmpty()) return "Last Name cannot be empty.";
-        try { parseDate(dobStr); } catch (Exception ex) { return ex.getMessage(); }
+        try { parseDate(dobStr, dateFormat); } catch (Exception ex) { return ex.getMessage(); }
         if (govID != null && !govID.isEmpty() && !isValidID(govID)) return "Government ID must contain only letters and numbers.";
         if (studentID != null && !studentID.isEmpty() && !isValidID(studentID)) return "Student ID must contain only letters and numbers.";
         if (studentID != null && !studentID.isEmpty() && (govID == null || govID.isEmpty())) return "Cannot use Student ID without Government ID.";
@@ -208,7 +241,8 @@ public class AppController {
         return null;
     }
     private Person buildPerson(String first, String last, String dobStr, String govID, String studentID) {
-        OCCCDate dob = parseDateUnchecked(dobStr);
+        // Fix: Always call parseDateUnchecked with both arguments
+        OCCCDate dob = parseDateUnchecked(dobStr, dateFormat);
         govID = (govID != null && !govID.isEmpty()) ? normalizeID(govID) : null;
         studentID = (studentID != null && !studentID.isEmpty()) ? normalizeID(studentID) : null;
         if (govID != null && studentID != null) return new OCCCPerson(new RegisteredPerson(first, last, dob, govID), studentID);
@@ -226,8 +260,62 @@ public class AppController {
             return new OCCCDate(day, month, year);
         } catch (NumberFormatException e) { throw new Exception("Invalid date format. Please use MM/dd/yyyy with numeric values"); }
     }
-    private static OCCCDate parseDateUnchecked(String dateStr) {
-        try { return parseDate(dateStr); } catch (Exception e) { return null; }
+    // --- Updated Date Parsing ---
+    public static OCCCDate parseDate(String dateStr, DateFormatType fmt) throws Exception {
+        if (dateStr == null || dateStr.trim().isEmpty()) throw new Exception("Date cannot be empty");
+        dateStr = dateStr.trim().replaceAll("\\s+", ""); // Remove all whitespace
+        String[] parts;
+        int day, month, year;
+        switch (fmt) {
+            case US: // MM/DD/YYYY
+                parts = dateStr.split("/");
+                if (parts.length != 3) throw new Exception("Invalid date format. Use MM/dd/yyyy");
+                month = Integer.parseInt(parts[0].trim());
+                day = Integer.parseInt(parts[1].trim());
+                year = Integer.parseInt(parts[2].trim());
+                return new OCCCDate(day, month, year);
+            case EURO: // DD/MM/YYYY
+                parts = dateStr.split("/");
+                if (parts.length != 3) throw new Exception("Invalid date format. Use dd/MM/yyyy");
+                day = Integer.parseInt(parts[0].trim());
+                month = Integer.parseInt(parts[1].trim());
+                year = Integer.parseInt(parts[2].trim());
+                return new OCCCDate(day, month, year);
+            case ISO: // YYYY-MM-DD or YYYY/MM/DD
+                dateStr = dateStr.replace('/', '-'); // Normalize all delimiters to dash
+                parts = dateStr.split("-");
+                if (parts.length != 3) throw new Exception("Invalid date format. Use yyyy-MM-dd");
+                year = Integer.parseInt(parts[0].trim());
+                month = Integer.parseInt(parts[1].trim());
+                day = Integer.parseInt(parts[2].trim());
+                OCCCDate result = new OCCCDate(day, month, year);
+                return result;
+            default:
+                throw new Exception("Unknown date format");
+        }
+    }
+    public OCCCDate parseDateWithCurrentFormat(String dateStr) throws Exception {
+        return parseDate(dateStr, dateFormat);
+    }
+    private static OCCCDate parseDateUnchecked(String dateStr, DateFormatType fmt) {
+        try { return parseDate(dateStr, fmt); } catch (Exception e) { return null; }
+    }
+    // --- Date Formatting Helper ---
+    public String formatDate(src.date.OCCCDate date) {
+        if (date == null) return "";
+        switch (dateFormat) {
+            case US:
+                return String.format("%02d/%02d/%04d", date.getMonthNumber(), date.getDayOfMonth(), date.getYear());
+            case EURO:
+                return String.format("%02d/%02d/%04d", date.getDayOfMonth(), date.getMonthNumber(), date.getYear());
+            case ISO:
+                return String.format("%04d-%02d-%02d", date.getYear(), date.getMonthNumber(), date.getDayOfMonth());
+            default:
+                return date.toString();
+        }
+    }
+    public OCCCDate parseDateUncheckedWithCurrentFormat(String dateStr) {
+        return parseDateUnchecked(dateStr, dateFormat);
     }
 
     // --- Module Getters ---

@@ -11,6 +11,7 @@ import src.app.dialogs.Dialogs;
 import src.app.modules.list.PList;
 import src.person.People;
 import src.app.gui.FlatButton;
+import src.app.AppController;
 
 public class PersonFilterImpl extends JPanel implements PFilter {
     // --- Field and Term controls: must be initialized before use ---
@@ -32,6 +33,9 @@ public class PersonFilterImpl extends JPanel implements PFilter {
     private FlatButton deleteFilterButton;
     private static final String FILTERS_FILE = "data/.assets/filters.ser";
     private static final int MAX_SAVED_FILTERS = 16;
+
+    // Use a reference to AppController directly for date formatting
+    private AppController appController;
 
     public PersonFilterImpl() {
         // Change main layout to BorderLayout
@@ -219,6 +223,10 @@ public class PersonFilterImpl extends JPanel implements PFilter {
         this.listModule = listModule;
     }
 
+    public void setAppController(AppController controller) {
+        this.appController = controller;
+    }
+
     @Override
     public JPanel getPanel() {
         return this;
@@ -256,7 +264,8 @@ public class PersonFilterImpl extends JPanel implements PFilter {
                     baseFilter = p -> p.getLastName() != null && p.getLastName().toLowerCase().contains(term);
                     break;
                 case "DOB":
-                    baseFilter = p -> p.getDOB() != null && p.getDOB().toString().toLowerCase().contains(term);
+                    baseFilter = p -> p.getDOB() != null &&
+                        appController != null && appController.formatDate(p.getDOB()).toLowerCase().contains(term);
                     break;
                 case "Government ID":
                     baseFilter = p -> {
@@ -280,7 +289,7 @@ public class PersonFilterImpl extends JPanel implements PFilter {
                     baseFilter = p ->
                         (p.getFirstName() != null && p.getFirstName().toLowerCase().contains(term)) ||
                         (p.getLastName() != null && p.getLastName().toLowerCase().contains(term)) ||
-                        (p.getDOB() != null && p.getDOB().toString().toLowerCase().contains(term));
+                        (p.getDOB() != null && appController != null && appController.formatDate(p.getDOB()).toLowerCase().contains(term));
             }
         }
         if (customFilter != null) {
@@ -339,10 +348,10 @@ public class PersonFilterImpl extends JPanel implements PFilter {
     }
 
     private int exportPeople(People people, java.io.File file, String format) throws Exception {
-        if (operations == null) throw new IllegalStateException("No Operations instance");
+        if (appController == null) throw new IllegalStateException("No AppController instance");
         java.util.function.Function<src.date.OCCCDate, String> dateFormatter = (date) -> {
             if (date == null) return "";
-            return String.format("%02d/%02d/%04d", date.getMonthNumber(), date.getDayOfMonth(), date.getYear());
+            return appController.formatDate(date);
         };
         if ("json".equals(format)) {
             return Dialogs.exportToJson(people, file, dateFormatter);
