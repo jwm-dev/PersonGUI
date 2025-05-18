@@ -60,7 +60,46 @@ public class Frame extends JFrame {
         exportAsItem = new FlatMenuItem("Export As...");
         JMenuItem importItem = new FlatMenuItem("Import...");
         JMenuItem exitItem = new FlatMenuItem("Exit");
-        newItem.addActionListener(_ -> fileActions.doNew(personModule::clearFields, listModule::clearSelection));
+        newItem.addActionListener(_ -> {
+            if (appController.isModified()) {
+                Object[] options = {"Save", "Don't Save", "Cancel"};
+                int response = JOptionPane.showOptionDialog(
+                    this,
+                    "There are unsaved changes. What would you like to do?",
+                    "Unsaved Changes",
+                    JOptionPane.YES_NO_CANCEL_OPTION,
+                    JOptionPane.WARNING_MESSAGE,
+                    null,
+                    options,
+                    options[0]
+                );
+                switch (response) {
+                    case JOptionPane.YES_OPTION:
+                        try {
+                            fileActions.doSaveAs();
+                            if (!appController.isModified()) {
+                                fileActions.doNew(personModule::clearFields, listModule::clearSelection);
+                            }
+                        } catch (Exception ex) {
+                            JOptionPane.showMessageDialog(
+                                this,
+                                "Error saving file: " + ex.getMessage(),
+                                "Save Error",
+                                JOptionPane.ERROR_MESSAGE
+                            );
+                        }
+                        break;
+                    case JOptionPane.NO_OPTION:
+                        fileActions.doNew(personModule::clearFields, listModule::clearSelection);
+                        break;
+                    case JOptionPane.CANCEL_OPTION:
+                    case JOptionPane.CLOSED_OPTION:
+                        break;
+                }
+            } else {
+                fileActions.doNew(personModule::clearFields, listModule::clearSelection);
+            }
+        });
         openItem.addActionListener(_ -> fileActions.doOpen(personModule::clearFields, listModule::clearSelection));
         saveItem.addActionListener(_ -> fileActions.doSave());
         saveAsItem.addActionListener(_ -> fileActions.doSaveAs());
