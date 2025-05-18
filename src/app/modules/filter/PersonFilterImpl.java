@@ -19,8 +19,8 @@ public class PersonFilterImpl extends JPanel implements PFilter {
     private final JComboBox<String> filterTypeBox = new JComboBox<>(new String[]{
         "First Name", "Last Name", "DOB", "Government ID", "Student ID", "All Fields"
     });
-    private final JButton clearButton;
-    private JButton exportButton;
+    private final FlatButton clearButton = new FlatButton("Clear");
+    private FlatButton exportButton = new FlatButton("Export Filtered");
     private Predicate<Person> customFilter;
     private FilterListener filterListener;
     private Dialogs operations;
@@ -46,11 +46,12 @@ public class PersonFilterImpl extends JPanel implements PFilter {
         int fieldHeight = 22;
         int fieldWidth = 100;
 
-        // --- Top-aligned Field/Term controls with correct label/field stacking ---
+        // --- Top-aligned Field/Term controls and Clear/Export buttons ---
         JPanel topFieldsPanel = new JPanel();
         topFieldsPanel.setLayout(new BoxLayout(topFieldsPanel, BoxLayout.Y_AXIS));
         topFieldsPanel.setOpaque(false);
         topFieldsPanel.setBorder(BorderFactory.createEmptyBorder(8, 12, 0, 0));
+        topFieldsPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         JLabel filterTypeLabel = new JLabel("Field");
         filterTypeLabel.setForeground(UIManager.getColor("Filter.foreground"));
         filterTypeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -66,7 +67,6 @@ public class PersonFilterImpl extends JPanel implements PFilter {
         searchLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         topFieldsPanel.add(Box.createVerticalStrut(6));
         topFieldsPanel.add(searchLabel);
-        // --- Fix the HEIGHT of the searchField ---
         searchField.setFont(searchField.getFont().deriveFont(Font.PLAIN, 16f));
         searchField.setMargin(new Insets(6, 8, 6, 8));
         searchField.setPreferredSize(new Dimension(240, 36));
@@ -77,7 +77,42 @@ public class PersonFilterImpl extends JPanel implements PFilter {
         searchField.setAlignmentX(Component.LEFT_ALIGNMENT);
         topFieldsPanel.add(searchField);
         topFieldsPanel.add(Box.createVerticalStrut(8));
-
+        // --- Clear/Export buttons panel (directly below Term field) ---
+        JPanel belowTermButtonPanel = new JPanel();
+        belowTermButtonPanel.setLayout(new BoxLayout(belowTermButtonPanel, BoxLayout.Y_AXIS));
+        belowTermButtonPanel.setOpaque(false);
+        clearButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        exportButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        belowTermButtonPanel.add(clearButton);
+        belowTermButtonPanel.add(Box.createVerticalStrut(8));
+        belowTermButtonPanel.add(exportButton);
+        belowTermButtonPanel.add(Box.createVerticalStrut(12));
+        belowTermButtonPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        topFieldsPanel.add(belowTermButtonPanel);
+        topFieldsPanel.add(Box.createVerticalStrut(8));
+        // --- Save/Delete filter buttons panel (above filter list) ---
+        JPanel aboveListButtonPanel = new JPanel();
+        aboveListButtonPanel.setLayout(new BoxLayout(aboveListButtonPanel, BoxLayout.Y_AXIS));
+        aboveListButtonPanel.setOpaque(false);
+        saveFilterButton = new FlatButton("Save Filter");
+        deleteFilterButton = new FlatButton("Delete Filter");
+        saveFilterButton.setMaximumSize(new Dimension(120, fieldHeight));
+        deleteFilterButton.setMaximumSize(new Dimension(120, fieldHeight));
+        saveFilterButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        deleteFilterButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        saveFilterButton.setBackground(UIManager.getColor("Filter.buttonBackground"));
+        saveFilterButton.setForeground(UIManager.getColor("Filter.buttonForeground"));
+        deleteFilterButton.setBackground(UIManager.getColor("Filter.buttonBackground"));
+        deleteFilterButton.setForeground(UIManager.getColor("Filter.buttonForeground"));
+        aboveListButtonPanel.add(saveFilterButton);
+        aboveListButtonPanel.add(Box.createVerticalStrut(4));
+        aboveListButtonPanel.add(deleteFilterButton);
+        // --- Delete All button (below filter list) ---
+        FlatButton deleteAllButton = new FlatButton("Delete All");
+        deleteAllButton.setMaximumSize(new Dimension(120, fieldHeight));
+        deleteAllButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        deleteAllButton.setBackground(UIManager.getColor("Filter.buttonBackground"));
+        deleteAllButton.setForeground(UIManager.getColor("Filter.buttonForeground"));
         // --- Saved Filters UI ---
         JPanel savedFiltersPanel = new JPanel();
         savedFiltersPanel.setLayout(new BorderLayout(6, 0));
@@ -97,66 +132,36 @@ public class PersonFilterImpl extends JPanel implements PFilter {
         savedFiltersScroll.setBackground(UIManager.getColor("Filter.textBackground"));
         savedFiltersScroll.setForeground(UIManager.getColor("Filter.textForeground"));
         savedFiltersPanel.add(savedFiltersScroll, BorderLayout.CENTER);
-        // --- Filter Buttons Panel ---
-        JPanel filterButtonsPanel = new JPanel();
-        filterButtonsPanel.setLayout(new BoxLayout(filterButtonsPanel, BoxLayout.Y_AXIS));
-        filterButtonsPanel.setOpaque(false);
-        saveFilterButton = new FlatButton("Save Filter");
-        deleteFilterButton = new FlatButton("Delete Filter");
-        saveFilterButton.setMaximumSize(new Dimension(120, fieldHeight));
-        deleteFilterButton.setMaximumSize(new Dimension(120, fieldHeight));
-        saveFilterButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-        deleteFilterButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-        saveFilterButton.setBackground(UIManager.getColor("Filter.buttonBackground"));
-        saveFilterButton.setForeground(UIManager.getColor("Filter.buttonForeground"));
-        deleteFilterButton.setBackground(UIManager.getColor("Filter.buttonBackground"));
-        deleteFilterButton.setForeground(UIManager.getColor("Filter.buttonForeground"));
-        filterButtonsPanel.add(saveFilterButton);
-        filterButtonsPanel.add(Box.createVerticalStrut(4));
-        filterButtonsPanel.add(deleteFilterButton);
-        // --- Delete All Button ---
-        FlatButton deleteAllButton = new FlatButton("Delete All");
-        deleteAllButton.setMaximumSize(new Dimension(120, fieldHeight));
-        deleteAllButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-        deleteAllButton.setBackground(UIManager.getColor("Filter.buttonBackground"));
-        deleteAllButton.setForeground(UIManager.getColor("Filter.buttonForeground"));
-        filterButtonsPanel.add(Box.createVerticalStrut(8));
-        filterButtonsPanel.add(deleteAllButton);
-        savedFiltersPanel.add(filterButtonsPanel, BorderLayout.EAST);
         // --- Wrapper to prevent stretching ---
         JPanel savedFiltersWrapper = new JPanel();
         savedFiltersWrapper.setLayout(new BoxLayout(savedFiltersWrapper, BoxLayout.Y_AXIS));
         savedFiltersWrapper.setOpaque(false);
+        savedFiltersWrapper.add(aboveListButtonPanel);
         savedFiltersWrapper.add(savedFiltersPanel);
-        savedFiltersWrapper.setPreferredSize(new Dimension(fieldWidth + 130, listHeight));
-        savedFiltersWrapper.setMaximumSize(new Dimension(fieldWidth + 130, listHeight));
-        savedFiltersWrapper.setMinimumSize(new Dimension(fieldWidth + 130, listHeight));
-        // --- Bottom buttons panel ---
-        JPanel buttonPanel = new JPanel();
-        buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.X_AXIS));
-        buttonPanel.setOpaque(false);
-        clearButton = new FlatButton("Clear");
-        exportButton = new FlatButton("Export Filtered");
-        clearButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-        exportButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-        buttonPanel.add(Box.createHorizontalGlue());
-        buttonPanel.add(clearButton);
-        buttonPanel.add(Box.createHorizontalStrut(10));
-        buttonPanel.add(exportButton);
-        buttonPanel.add(Box.createHorizontalGlue());
-
+        savedFiltersWrapper.add(Box.createVerticalStrut(8));
+        savedFiltersWrapper.add(deleteAllButton);
+        savedFiltersWrapper.setPreferredSize(new Dimension(fieldWidth + 130, listHeight + 80));
+        savedFiltersWrapper.setMaximumSize(new Dimension(fieldWidth + 130, listHeight + 80));
+        savedFiltersWrapper.setMinimumSize(new Dimension(fieldWidth + 130, listHeight + 80));
         // --- Layout main panel ---
         setLayout(new BorderLayout());
         add(topFieldsPanel, BorderLayout.NORTH);
-        // Center panel to prevent stretching of savedFiltersWrapper
+        // Center panel for vertical glue and bottom alignment
         JPanel centerPanel = new JPanel();
         centerPanel.setLayout(new BoxLayout(centerPanel, BoxLayout.Y_AXIS));
         centerPanel.setOpaque(false);
         centerPanel.add(Box.createVerticalGlue());
-        centerPanel.add(savedFiltersWrapper);
-        centerPanel.add(Box.createVerticalGlue());
+        // Bottom panel for filter list and its buttons, aligned to bottom
+        JPanel bottomPanel = new JPanel();
+        bottomPanel.setLayout(new BoxLayout(bottomPanel, BoxLayout.Y_AXIS));
+        bottomPanel.setOpaque(false);
+        bottomPanel.add(savedFiltersWrapper);
+        bottomPanel.setAlignmentY(Component.BOTTOM_ALIGNMENT);
+        centerPanel.add(bottomPanel);
         add(centerPanel, BorderLayout.CENTER);
-        add(buttonPanel, BorderLayout.SOUTH);
+        // --- Left-justify combo box and term field ---
+        filterTypeBox.setAlignmentX(Component.LEFT_ALIGNMENT);
+        searchField.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         searchField.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) { notifyFilterChanged(); }
