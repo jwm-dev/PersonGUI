@@ -961,15 +961,6 @@ public class PersonViewerImpl implements PViewer, AppController.DateFormatChange
         calendarDialog.setLocation(x, y);
         calendarDialog.setVisible(true);
     }
-    // Recursively add mouse listeners to all components in the dialog
-    private void addMouseListenerRecursively(Component comp, MouseAdapter listener) {
-        comp.addMouseListener(listener);
-        if (comp instanceof Container) {
-            for (Component child : ((Container) comp).getComponents()) {
-                addMouseListenerRecursively(child, listener);
-            }
-        }
-    }
 
     private java.util.Date parseDOBFieldToDate() {
         String dobText = dobField.getText().trim();
