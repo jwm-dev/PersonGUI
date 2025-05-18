@@ -1,9 +1,82 @@
-# TO-DO
-1) Split the filter/list modules into APIs to reflect the same architecture the terminal, viewer, and GUI currently have
-2) Fix themeing. Trying to consolidate everything theme related into Themes.java under the GUI API but it still doesn't work.
-3) Fix the ConfigEditorDialog once themes are working correctly so that it has a live preview of selected themes and appropriately handles switching themes
-4) Possibly refactor GUI API into separate GUI and rendering components. Might be how to fix points 2 & 3. My knowledge of Java Swing is clearly kind of limited - it feels so much harder to get this working in Java vs just using egui in Rust or something!
-5) We have dedicated /ppl, /txt, and /json subdirectories in /data. We need to make sure that the terminal and all other things that interact with files are locked down to the internal data directory. The correct dialogues should open to the correct directories too. If I change my Export As... dialog box to .txt files, for example, it should automatically go to the data/txt directory **for the user**. We could allow the import functionality to be the only thing that ventures outside the project directory, this would be the safest option imo
-6) I was working on a scripting functionality but haven't touched it bc I got bogged down trying to detangle *why* themes aren't working as I intended... if we have time I will finish it out so the terminal or something can run scripts. Maybe provide an example webscraper script to make .ppl file from Wikipedia lists of people or something. Either way, secondary concern fs.
-7) Make sure all modules and data flow through AppController.java; the AppController needs to remain the ultimate source of truth for any of these changing/variable/moving components in the app. This way we have a state engine to keep things consistent.
-8) probably a ton of other stuff i'm not thinking of rn idk lmao
+# Person Manager Application
+
+A modern, cross-platform Java desktop application for managing large collections of people, with rich metadata, advanced filtering, and a modular, themeable GUI. 
+
+## Features
+
+- **Modular GUI**: Four main modules—List, Viewer, Filter, and Terminal—provide a complete workflow for managing person data.
+- **Rich Metadata**: Each person entry supports names, OCCCDate-based date of birth, government/student IDs, descriptions, and tags.
+- **Live Retheming**: Instantly switch between several included themes without restarting the app.
+- **Advanced Filtering**: Powerful, user-friendly filter module with custom filter saving and exporting.
+- **Terminal Module**: Command-line interface for batch operations, scripting, and power-user features.
+- **Import from Wikipedia**: Built-in script to import lists of people from Wikipedia (e.g., computer scientists).
+- **Data Export**: Export filtered lists to .ppl, .json, or .txt formats.
+- **Cross-Platform**: Runs on any OS with Java 17+ (tested on Linux).
+
+## Modules Overview
+
+### List Module
+- Displays all people in a sortable, filterable table.
+- Supports selection, viewing, and integration with the filter module.
+- Click a row to view/edit details in the Viewer module.
+
+### Viewer Module
+- View and edit details for a selected person.
+- Add, update, or delete entries.
+- Edit metadata: description and tags.
+- Date of birth entry with calendar popup and live date format switching.
+- All changes are reflected instantly in the List module.
+
+### Filter Module
+- Search and filter people by name, ID, DOB, and more.
+- Save and reuse custom filters.
+- Export filtered results to .ppl, .json, or .txt.
+- User-friendly interface with live updates.
+
+### Terminal Module
+- Command-line interface for advanced/batch operations.
+- Supports listing, finding, adding, editing, and deleting people.
+- File operations (ls, cd, cat, grep, etc.) within the data directory.
+- Scripting support and configuration commands.
+- Fun easter egg: play the Star Wars ASCII movie.
+
+## Theming
+- Choose from several built-in themes.
+- Instantly apply new themes from the Tools menu or via the terminal (`set THEME <name>`).
+- All modules update live, including popups and dialogs.
+
+## Getting Started
+
+### Prerequisites
+- Java 17 or newer (OpenJDK or Oracle JDK)
+
+### Build & Run
+1. Download or clone this repository.
+2. Compile:
+   ```
+   javac PersonApp.java
+   ```
+3. Run:
+   ```
+   java PersonApp
+   ```
+
+No additional setup is required. All data is stored in the `data/` directory.
+
+## Importing People from Wikipedia
+- Use the built-in Wikipedia Import tool (Tools → Import from Wikipedia...) to fetch and import lists of people (e.g., computer scientists) directly into your database.
+
+## Who is this for?
+- Anyone who needs to manage large amounts of person data: researchers, educators, archivists, or hobbyists.
+- Designed for both casual users and power users (with the terminal module).
+
+## Authors
+- Jeffrey
+- Damon
+
+## License
+This project is provided as-is for educational and personal use.
+
+---
+
+*For more information, see the in-app Help menu or About dialog.*
